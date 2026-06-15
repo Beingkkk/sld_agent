@@ -24,32 +24,20 @@ SLD 1.0.0 XML
 OGC XSD 校验 + Parser Roundtrip 校验
 ```
 
-## 当前阶段
+## 项目状态
 
-- **设计文档**：已完成，见 [`Document/design/`](Document/design/)。
-- **P0 Spike**：已全部验证完成，结论已同步回设计文档。
-  - [`spike/parser-e2e/`](spike/parser-e2e/)：Parser 写/读/roundtrip 与 XSD 校验。
-  - [`spike/llm-json-styleparams/`](spike/llm-json-styleparams/)：LLM 在 JSON Schema 约束下的输出稳定性。
-  - [`spike/knowledge-base-prompt/`](spike/knowledge-base-prompt/)：JSON 知识库加载、合并与 Prompt 注入。
-  - [`spike/electron-ws-startup/`](spike/electron-ws-startup/)：Electron 主进程启动 Node 后端并向渲染进程暴露本地 WebSocket。
-  - [`spike/xmllint-wasm-bundle/`](spike/xmllint-wasm-bundle/)：项目级 `xmllint-wasm` schema bundle 自动化。
-  - [`spike/openlayers-preview/`](spike/openlayers-preview/)：OpenLayers + `geostyler-openlayers-parser` 对 MVP 样式预览能力验证。
-- **下一步**：编写 SDD 产物（`Document/spec.md`、`Document/plan-{module}.md`），并搭建 MVP 骨架（`SourceCode/backend/`、`SourceCode/frontend/`）。
+项目处于早期工程验证阶段。Parser roundtrip、XSD 离线校验、LLM JSON Schema 稳定性、知识库合并、Electron / WebSocket 启动等关键技术难点已通过内部 spike 验证，相关结论已沉淀到设计文档。当前正在推进 SDD 产物编写与 MVP 代码骨架搭建。
 
-## 项目结构
+## 仓库内容
 
 ```
 .
-├── CLAUDE.md                       # Claude Code 项目指引
+├── CLAUDE.md                       # 项目开发指引
 ├── Document/
-│   ├── design/                     # 设计文档（不提交）
-│   ├── Research/                   # 研究资料（不提交）
 │   └── UX/                         # 交互原型
 ├── SourceCode/
 │   └── config/
-│       ├── config.json.template    # LLM 连接配置模板
-│       └── config.json             # 本地运行时配置（不提交）
-├── spike/                          # 技术验证目录（不提交）
+│       └── config.json.template    # LLM 连接配置模板
 └── README.md
 ```
 
@@ -63,42 +51,11 @@ OGC XSD 校验 + Parser Roundtrip 校验
 cp SourceCode/config/config.json.template SourceCode/config/config.json
 ```
 
-编辑 [`SourceCode/config/config.json`](SourceCode/config/config.json) 中的 `apiKey` 与所选 `provider`。
+编辑 `SourceCode/config/config.json` 中的 `apiKey` 与所选 `provider`。
 
-### 2. 运行 Spike 验证
+### 2. 启动服务
 
-```bash
-# Parser 端到端验证
-cd spike/parser-e2e
-npm install
-npm test
-node test-wasm-local.js
-
-# LLM → JSON Schema → StyleParams 稳定性
-cd spike/llm-json-styleparams
-npm install
-npm test
-
-# JSON 知识库与 Prompt 注入
-cd spike/knowledge-base-prompt
-npm install
-npm test
-
-# Electron + WebSocket 启动模式
-cd spike/electron-ws-startup
-npm install
-npm run test:e2e
-
-# xmllint-wasm schema bundle 自动化
-cd spike/xmllint-wasm-bundle
-npm install
-npm test
-
-# OpenLayers 预览能力验证
-cd spike/openlayers-preview
-npm install
-npm test
-```
+后端与前端 MVP 骨架正在搭建中，完整启动方式将在后续版本补充。
 
 ## 技术栈
 
@@ -123,8 +80,5 @@ npm test
 
 ## 了解更多
 
-- 项目指引与上下文：[CLAUDE.md](CLAUDE.md)
-- 设计文档索引：[Document/design/README.md](Document/design/README.md)
-- 接口契约：[Document/design/interface-contracts.md](Document/design/interface-contracts.md)
-- 样式构建器设计：[Document/design/style-builder.md](Document/design/style-builder.md)
-- SLD 服务设计：[Document/design/sld-service.md](Document/design/sld-service.md)
+- 项目开发指引：[CLAUDE.md](CLAUDE.md)
+- 交互原型：[Document/UX/index.html](Document/UX/index.html)
