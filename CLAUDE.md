@@ -28,30 +28,16 @@ SLD 1.0.0 XML
 OGC XSD 校验（xmllint / xmllint-wasm）+ Parser Roundtrip 校验
 ```
 
-项目遵循 **SDD（规范驱动开发）**：`Document/` 下的需求与设计文档是编写 `Document/spec.md` 和 `Document/plan-{module}.md` 的前置输入，之后才能进入编码。
+项目遵循 **SDD（规范驱动开发）**：`Document/` 下的需求与设计文档是编写 `Document/spec.md` 和 `Document/plan-{module}.md` 的前置输入，代码实现必须能追溯到对应 plan 的接口定义章节。变更必须走 `Document/changes/proposal-*.md`，禁止直接修改已锁定的 spec 或 plan。
 
 ## 当前阶段
 
-- **设计**：已完成并对齐 MVP 参数化精修方向，见 [`Document/design/`](Document/design/)。
-  - 关键更新：右侧检查器原型改为左右双列——左侧可编辑 GeoStyler / 参数精修 / 规则列表，右侧只读 SLD XML。
-- **P0 Spike**：全部完成，结论已反向同步到 design 文档。
-  - [`spike/parser-e2e/report.md`](spike/parser-e2e/report.md) — Parser 写/读/roundtrip 与 XSD 校验。
-  - [`spike/llm-json-styleparams/result.md`](spike/llm-json-styleparams/result.md) — LLM 在 JSON Schema 约束下的输出稳定性与多轮字段保留。
-  - [`spike/knowledge-base-prompt/result.md`](spike/knowledge-base-prompt/result.md) — JSON 知识库加载、合并与 Prompt 注入。
-  - [`spike/electron-ws-startup/result.md`](spike/electron-ws-startup/result.md) — Electron 主进程启动 Node 后端并向渲染进程暴露本地 WebSocket。
-  - [`spike/xmllint-wasm-bundle/result.md`](spike/xmllint-wasm-bundle/result.md) — 项目级 `xmllint-wasm` schema bundle 自动化，用于离线 XSD 校验。
-  - [`spike/openlayers-preview/result.md`](spike/openlayers-preview/result.md) — OpenLayers + `geostyler-openlayers-parser` 对 MVP 样式预览能力验证。
-- **P1/P2 Spike 规划**：已创建目录与计划，待启动，见各目录下 `README.md`。
-  - `spike/rule-generator/` — 后端分类/分级断点计算。
-  - `spike/ol-preview/` — Vue 3 中 OpenLayers 实时预览组件（与 `openlayers-preview` 技术验证互补）。
-  - `spike/filter-editor/` — Filter 编辑器与 CQL 预览。
-  - `spike/sld-import-flow/` — SLD 导入前端→后端完整链路。
-  - `spike/electron-file-io/` — Electron 文件对话框与本地文件 IO。
-  - `spike/llm-adapter/` — 多模型 LLM 抽象与本地模型。
-  - `spike/geojson-schema/` — GeoJSON 数据 schema 提取。
-  - `spike/style-patch/` — `apply_patch` / JSON Patch 语义。
-  - `spike/validation-error-location/` — Validation 错误精确定位。
-- **源码**：[`SourceCode/`](SourceCode/) 目前只有 [`SourceCode/config/config.json`](SourceCode/config/config.json) 用于配置 LLM 连接。后端/前端骨架尚未搭建。
+MVP 代码骨架与核心模块已实现并提交到 `main`：
+
+- **SDD 文档**：`Document/constitution.md`、`spec.md`、5 个 `plan-{module}.md`、`design/` 已冻结或按 proposal 流程更新。
+- **后端**：`SourceCode/backend/` 已实现 WebSocket 服务、AgentSession、StyleBuilder、SldService、KnowledgeBaseLoader、PromptBuilder、LlmClient，单元测试 21 个全部通过。
+- **前端**：`SourceCode/frontend/` 已实现 Vue 3 + Electron 骨架、Pinia Store、WebSocket 客户端、MapPreview、Inspector、Assistant、Toolbar、StatusBar 及新增组件（SymbolizerEditor、ValidationPanel、FilterEditor），单元测试 8 个全部通过。
+- **Spikes**：`spike/` 下已完成的 P0 结论已反向同步到设计文档；P1/P2 目录保留未跟踪，不进入版本控制。
 
 ## 高层架构
 
@@ -86,88 +72,78 @@ OGC XSD 校验（xmllint / xmllint-wasm）+ Parser Roundtrip 校验
 - 追踪调用流 / X 如何到达 Y → `codegraph_trace`
 - 批量查看相关符号源码 → `codegraph_explore`
 
-> 注意：截至最新会话，`.codegraph/` 索引尚未初始化。若遇到 "No CodeGraph project loaded"，请运行 `codegraph init -i` 建立索引，或继续使用 Read/Grep 处理字面文本查询。
+若 `.codegraph/` 索引过期或缺失，运行 `npx codegraph init -i` 重建。
 
 ## 技术栈
 
 | 层级 | 技术 |
 |---|---|
 | 后端 | Node.js 20.6+、TypeScript 5.x、`geostyler-sld-parser`、`geostyler-style`、`chroma-js`、`ajv`、`ws`、`commander` |
-| LLM | Anthropic / OpenAI Node SDK 或 `litellm`；配置位于 `SourceCode/config/config.json` |
-| 前端 | Vue 3、Electron、`geostyler-openlayers-parser`、OpenLayers |
+| LLM | Anthropic / OpenAI Node SDK；配置位于 `SourceCode/config/config.json`（本地文件，不提交） |
+| 前端 | Vue 3、Electron、`geostyler-openlayers-parser`、`geostyler-sld-parser`、`OpenLayers`、`Pinia` |
 | 通信 | WebSocket（渲染进程直接连接；Electron 主进程仅管理后端生命周期） |
 | 校验 | `ajv`（JSON Schema）+ 系统 `xmllint` / `xmllint-wasm`（OGC XSD） |
 | 测试 | `vitest` |
-| 代码质量 | `eslint`、`typescript`、`prettier` |
+| 代码质量 | `eslint`、`typescript` |
 
 ## 常用命令
 
-### Spikes（当前可运行）
-
-```bash
-# Parser 端到端验证
-cd spike/parser-e2e
-npm install
-npm test                  # write/read/roundtrip + 系统 xmllint XSD
-node test-wasm-local.js   # xmllint-wasm 离线 bundle 校验
-
-# LLM → JSON Schema → StyleParams 稳定性
-cd spike/llm-json-styleparams
-npm install
-npm test                  # 运行全部 generate/modify 用例，输出 data.json
-npm run typecheck         # tsc --noEmit
-
-# JSON 知识库与 Prompt 注入
-cd spike/knowledge-base-prompt
-npm install
-npm test                  # 运行 default/transport/landuse 用例，输出 data.json
-
-# Electron + WebSocket 启动模式
-cd spike/electron-ws-startup
-npm install
-npm start                 # 启动 Electron，后端自动拉起
-npm run server            # 单独运行后端
-npm run test:server       # 后端独立测试
-npm run test:e2e          # Electron + 后端 + 渲染进程端到端测试
-
-# xmllint-wasm schema bundle 自动化
-cd spike/xmllint-wasm-bundle
-npm install
-npm run download          # 生成 schemas/ bundle
-npm run test:node         # Node 环境 XSD 校验
-npm run test:electron     # Electron 环境 XSD 校验
-npm test                  # download + node + electron
-
-# OpenLayers 预览能力验证
-cd spike/openlayers-preview
-npm install
-npm test                  # Node.js 转换验证：12/12 用例
-python -m http.server 8080
-# 浏览器访问 http://localhost:8080/ 查看可视化渲染
-```
-
-### 后端（待 `SourceCode/backend` 搭建后启用）
+### 后端
 
 ```bash
 cd SourceCode/backend
 npm install
-npm run dev          # 开发模式启动 WebSocket 后端
-npm run cli          # CLI 入口
-npm run build        # 编译 TypeScript
-npm run test         # vitest
-npm run test:unit path/to/test.ts   # 运行单个测试文件（vitest 惯例）
-npm run lint         # eslint
+npm run dev          # tsx 开发启动（输出 READY 行）
+npm run build        # 编译到 dist/
+npm run test         # vitest 全部测试
+npm run test:unit tests/unit/AgentSession.test.ts   # 单个测试文件
 npm run typecheck    # tsc --noEmit
+npm run lint         # eslint
 ```
 
-### 前端（待 `SourceCode/frontend` 搭建后启用）
+### 前端
 
 ```bash
 cd SourceCode/frontend
 npm install
-npm run dev          # Electron + Vue 开发模式
-npm run build        # 生产构建
+npm run dev          # Vite 开发服务器
+npm run build        # vue-tsc + vite build
+npm run test         # vitest（包含 tests/unit 与 src/**/*.test.ts）
+npm run typecheck    # vue-tsc --noEmit
+npm run electron:dev # Electron 开发模式
+npm run electron:build # Electron 打包
 ```
+
+### 端到端开发流程
+
+1. 复制或创建 `SourceCode/config/config.json` 并填写 LLM 端点与 API Key。
+2. 启动后端：`cd SourceCode/backend && npm run build && node dist/index.js`，记录输出的端口。
+3. 启动前端：`cd SourceCode/frontend && npm run dev`，浏览器访问 `http://localhost:5173/?port={后端端口}`。
+
+### Spikes
+
+`spike/` 目录未进入版本控制。已完成的 spike 可直接本地运行，例如：
+
+```bash
+cd spike/parser-e2e && npm install && npm test
+cd spike/xmllint-wasm-bundle && npm install && npm run download && npm test
+cd spike/openlayers-preview && npm install && npm test
+```
+
+## 共享代码与路径别名
+
+- **SourceCode/shared/**：前后端共享的类型定义、`WsMessage` 契约、`FilterNode` 适配器与 CQL 转换。
+  - 前端通过 `@shared` 别名引用（`vite.config.ts` 中配置为 `../shared`）。
+  - 后端当前在 `SourceCode/backend/src/shared/` 中维护独立副本，两者内容应保持同步；长期应将后端也迁移到 `SourceCode/shared/`。
+- **前端内部**：`@/` 别名指向 `SourceCode/frontend/src/`。
+
+## 已知设计债与实现注意
+
+1. **`apply_patch` 当前作用于 `StyleParams`**，而非 `GeoStyler Style`。`interface-contracts.md` 中的路径示例（如 `/rules/0/symbolizers/0/width`）描述的是对 Style 的修改，但当前实现把 patch 应用到 `StyleParams` 后再走 `StyleBuilder` 重建。这会导致部分 GeoStyler 特有字段无法通过 patch 直接编辑。需要在后续 proposal 中明确并统一语义。
+2. **`SldService` 的 XSD/Roundtrip 组件内联**：`XsdValidator`、`RoundtripValidator`、`XmlGeometryStripper`、`ValidationReporter` 目前都是 `SldService.ts` 中的私有函数，未按 `plan-sld-service.md` 拆分为独立模块。
+3. **`RuleGenerator` 近似实现**：`quantile` / `naturalBreaks` 目前退化为 `equalInterval`，因为 MVP 未接入原始要素采样值。
+4. **前端缺少组件级测试**：FilterEditor、SymbolizerEditor、ValidationPanel、MapPreview 等组件仅有功能实现，无 Vue Test Utils 测试。
+5. **`SourceCode/backend/src/shared/` 与 `SourceCode/shared/` 重复**：修改 Filter adapter、messages、types 时需要同时同步两份副本，直到后端迁移完成。
 
 ## Spike 已验证约束
 
@@ -202,13 +178,12 @@ npm run build        # 生产构建
    `geostyler-openlayers-parser` 可稳定渲染 simple / categorized / classified / text / scale-denominator；`Mark` 的多种 `wellKnownName` 通过 SVG Icon 实现；线/面属性、虚线、透明度、旋转均正确转换。渐变、图案填充、图案线型不支持或仅部分支持；预览与 GeoServer 最终效果存在差异，需在 UI 中提示。  
    见 [`spike/openlayers-preview/result.md`](spike/openlayers-preview/result.md) 与 [`Document/design/requirements.md`](Document/design/requirements.md) §3.6。
 
-## 本地资源
+## 本地资源与忽略文件
 
-- LLM 连接配置：[`SourceCode/config/config.json`](SourceCode/config/config.json)
-- SLD 1.0.0 XSD：[`Document/Research/sld/1.0.0/StyledLayerDescriptor.xsd`](Document/Research/sld/1.0.0/StyledLayerDescriptor.xsd)
-- SLD 1.0.0 样例：[`Document/Research/sld/1.0.0/example-sld.xml`](Document/Research/sld/1.0.0/example-sld.xml)
-- Schema bundle 下载脚本原型：[`spike/xmllint-wasm-bundle/scripts/download-sld-schemas.js`](spike/xmllint-wasm-bundle/scripts/download-sld-schemas.js)
-- UX 交互原型：[`Document/UX/index.html`](Document/UX/index.html)
+- **LLM 连接配置**：`SourceCode/config/config.json`（本地文件，不提交，已由 `.gitignore` 排除）。
+- **XSD 与参考文档**：`Document/Research/`（本地目录，不提交，已由 `.gitignore` 排除）。开发中若需要 SLD 1.0.0 XSD，可从 `spike/parser-e2e/schemas-local/` 或 `spike/xmllint-wasm-bundle/` 获取。
+- **Schema bundle 下载脚本原型**：[`spike/xmllint-wasm-bundle/scripts/download-sld-schemas.js`](spike/xmllint-wasm-bundle/scripts/download-sld-schemas.js)
+- **UX 交互原型**：[`Document/UX/index.html`](Document/UX/index.html)
 
 ## 关键约束
 
@@ -222,13 +197,11 @@ npm run build        # 生产构建
 
 ## 下一步
 
-1. **完成待启动 Spike（按优先级）** — 降低核心模块实现风险：
-   - P1：`spike/rule-generator/`、`spike/filter-editor/`、`spike/sld-import-flow/`、`spike/electron-file-io/`。
-   - P2：`spike/llm-adapter/`、`spike/geojson-schema/`、`spike/style-patch/`、`spike/validation-error-location/`。
-2. **编写 SDD 产物** — 基于设计文档与 Spike 结论创建 `Document/spec.md` 与 `Document/plan-{module}.md`。
-3. **搭建 MVP 代码骨架** — `SourceCode/backend/`（Node/TS WebSocket 服务端 + CLI）与 `SourceCode/frontend/`（Electron + Vue）。
-4. **构建核心模块** — `AgentSession`、`KnowledgeBaseLoader` / `PromptBuilder`、`StyleBuilder` 与各子 Builder、`SldService`、`FilterEditor`。
-5. **接入校验管线** — 将 `xmllint-wasm` schema bundle 接入生产校验流程。
+1. **使用真实 `xmllint-wasm` schema bundle 验证生产级 XSD 校验**。
+2. **补充前端组件测试**（FilterEditor、SymbolizerEditor、ValidationPanel、MapPreview）。
+3. **完善 Electron 主进程集成测试与本地文件 IO**。
+4. **细化 `apply_patch` 本地乐观更新语义**，明确 patch 目标是 `StyleParams` 还是 `GeoStyler Style`。
+5. **统一共享代码目录**：将 `SourceCode/backend/src/shared/` 迁移到 `SourceCode/shared/`，消除重复副本。
 
 ## 代码引用规范
 
