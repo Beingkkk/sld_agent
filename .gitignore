@@ -1,0 +1,13 @@
+# Dependencies
+node_modules/
+
+# Spike raw data
+spike/*/data.json
+spike/*/__pycache__/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
