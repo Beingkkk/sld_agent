@@ -1,0 +1,18 @@
+{
+  "styleCatalog": [
+    { "style_type": "categorized", "geometry_types": ["line"], "description": "道路按等级分类" }
+  ],
+  "parameterDictionary": {
+    "stroke_color": { "name": "stroke_color", "type": "color", "description": "道路颜色" }
+  },
+  "constraints": [
+    "高速公路使用红色 #E31A1C",
+    "省道使用橙色 #FD8D3C",
+    "县道使用灰色 #969696",
+    "铁路使用黑色虚线 8 3"
+  ],
+  "fewShotExamples": [],
+  "modificationRules": [
+    "修改道路宽度时保持道路等级颜色不变"
+  ]
+}

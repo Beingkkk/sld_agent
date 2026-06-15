@@ -1,13 +1,38 @@
 # Dependencies
 node_modules/
 
+# Build outputs
+dist/
+dist-electron/
+release/
+*.tsbuildinfo
+
 # Spike raw data
 spike/*/data.json
 spike/*/__pycache__/
 
 # Logs
 *.log
+npm-debug.log*
 
 # OS
 .DS_Store
 Thumbs.db
+
+# Local env
+.env
+.env.local
+
+# Research materials (large binaries and reference docs, kept locally)
+Document/Research/
+
+# Local configuration (may contain secrets)
+SourceCode/config/
+
+# CodeGraph local data
+.codegraph/*.db
+.codegraph/*.db-shm
+.codegraph/*.db-wal
+.codegraph/cache/
+.codegraph/*.log
+.codegraph/.dirty

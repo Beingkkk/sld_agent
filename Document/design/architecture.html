@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SLDAgent — 模块与核心类设计</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --panel: #161a22;
+      --text: #e6e9f0;
+      --muted: #9aa3b2;
+      --accent: #58a6ff;
+      --border: #2d333b;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Microsoft YaHei", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+    }
+    header {
+      padding: 2rem 2rem 1rem;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(90deg, #111827 0%, #0f1117 100%);
+    }
+    header h1 { margin: 0 0 .4rem; font-size: 1.8rem; color: var(--accent); }
+    header p { margin: 0; color: var(--muted); }
+    main { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+    section { margin-bottom: 3rem; }
+    h2 { color: #79c0ff; margin-top: 0; border-left: 4px solid var(--accent); padding-left: .8rem; }
+    h3 { color: #d2a8ff; margin-top: 2rem; }
+    .module-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+    .module-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem 1.2rem;
+    }
+    .module-card h4 { margin: 0 0 .5rem; color: #7ee787; }
+    .module-card ul { margin: .5rem 0 0; padding-left: 1.2rem; color: var(--muted); }
+    .module-card li { margin: .25rem 0; }
+    .mermaid {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem;
+      margin: 1rem 0;
+      overflow-x: auto;
+    }
+    .note {
+      background: rgba(88, 166, 255, .08);
+      border-left: 3px solid var(--accent);
+      padding: .8rem 1rem;
+      color: var(--muted);
+      border-radius: 0 6px 6px 0;
+      margin: 1rem 0;
+    }
+    code {
+      background: rgba(255,255,255,.08);
+      padding: .15rem .35rem;
+      border-radius: 4px;
+      font-family: "SFMono-Regular", Consolas, monospace;
+      color: #ff7b72;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    th, td { padding: .75rem 1rem; text-align: left; border-bottom: 1px solid var(--border); }
+    th { background: #1f242c; color: #7ee787; font-weight: 600; }
+    tr:last-child td { border-bottom: none; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>SLDAgent — 模块与核心类设计</h1>
+    <p>基于 <a href="requirements.md">requirements.md</a>、<a href="technical-details-index.md">technical-details-index.md</a>、<a href="../Research/GeoStyler复用报告.md">GeoStyler 复用报告</a> 收敛出的高层模块划分与核心类。</p>
+  </header>
+
+  <main>
+    <section>
+      <h2>1. 设计原则</h2>
+      <ul>
+        <li><strong>后端持有权威 Style 状态</strong>：前端把人工编辑作为 patch 提交，后端应用后返回新状态，保证多轮对话上下文一致。</li>
+        <li><strong>JSON Schema 是唯一契约</strong>：LLM 输出、运行时校验、接口文档都围绕 Schema 展开。</li>
+        <li><strong>GeoStyler 是 SLD 唯一权威</strong>：前后端使用同一版本 <code>geostyler-sld-parser</code>。</li>
+        <li><strong>失败即回退</strong>：后端保存 <code>last_valid_style</code>，生成或校验失败时直接回退，不维护多轮历史。</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>2. 顶层模块一览</h2>
+      <table>
+        <thead>
+          <tr><th>模块</th><th>核心职责</th><th>核心类 / 文件</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Entry & Transport</td><td>CLI / WebSocket 入口、消息路由；Electron 主进程仅管理后端生命周期，渲染进程直连 WebSocket</td><td>WsServer, MessageRouter, CliEntry, BackendProcessManager</td></tr>
+          <tr><td>Knowledge Base</td><td>加载 JSON 知识库、维护三层字段映射、注入 LLM 上下文</td><td>KnowledgeBaseLoader, DomainRegistry, ParameterDictionary, MappingTable</td></tr>
+          <tr><td>LLM Parsing</td><td>统一模型调用、Prompt 构建、Schema 校验、响应解析</td><td>LlmClient, AnthropicClient, PromptBuilder, StyleParamsValidator</td></tr>
+          <tr><td>Style Building</td><td>把受 Schema 约束的参数映射为 GeoStyler Style</td><td>StyleBuilder, SimpleStyleBuilder, ClassifiedStyleBuilder, DefaultValueResolver</td></tr>
+          <tr><td>Rule Generation</td><td>分类 / 分级断点计算、色带生成</td><td>RuleGenerator, ColorRampGenerator, ClassificationMethod</td></tr>
+          <tr><td>SLD Service</td><td>SLD 读写、XSD 校验、Parser 双向校验</td><td>SldParserWrapper, XsdValidator, RoundtripValidator, ValidationReporter</td></tr>
+          <tr><td>Agent Session</td><td>维护当前 Style、聊天历史、校验状态、回退</td><td>AgentSession, StyleSnapshot, Turn, ValidationResult</td></tr>
+          <tr><td>Frontend</td><td>Vue 3 + Electron 桌面客户端、地图预览、规则编辑</td><td>AppShell, ChatStore, StyleStore, WsClient, MapPreview, RulesPanel, FileService</td></tr>
+          <tr><td>Shared Contracts</td><td>前后端共享类型与 WebSocket 消息契约</td><td>WsMessage, GenerateRequest, ModifyRequest, StyleParams, ValidationReport</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>3. 整体架构图</h2>
+      <div class="mermaid">
+graph TB
+  subgraph Frontend["Electron + Vue 3 渲染进程"]
+    APP[AppShell]
+    CHAT[ChatPanel]
+    RULE[RulesPanel / RuleEditor]
+    MAP[MapPreview]
+    INS[Inspector]
+    STORES[(ChatStore / StyleStore)]
+    WS_CLIENT[WsClient]
+    FILE_SVC[FileService]
+    OL[OpenLayers + geostyler-openlayers-parser]
+  end
+
+  subgraph Main["Electron 主进程"]
+    BACKEND_PROC[BackendProcessManager]
+    IPC[IpcBridge]
+  end
+
+  subgraph Backend["Node.js / TypeScript Agent 后端"]
+    WS[WsServer]
+    ROUTER[MessageRouter]
+    SESSION[AgentSession]
+    KB[KnowledgeBaseLoader]
+    LLM[LlmClient]
+    PROMPT[PromptBuilder]
+    VALID[StyleParamsValidator]
+    SB[StyleBuilder]
+    RG[RuleGenerator]
+    SLD[SldService]
+    XSD[XsdValidator]
+  end
+
+  APP --> CHAT & RULE & MAP & INS
+  CHAT & RULE --> STORES
+  STORES --> WS_CLIENT
+  WS_CLIENT -.直接 WebSocket .-> WS
+  BACKEND_PROC -.启动/停止后端子进程 .-> Backend
+  IPC -.文件/窗口控制 .-> FILE_SVC
+  WS --> ROUTER --> SESSION
+  SESSION --> KB & LLM & SB & SLD
+  LLM --> PROMPT --> KB
+  LLM --> VALID --> SB
+  SB --> RG
+  SLD --> XSD
+  MAP --> OL --> STORES
+  FILE_SVC --> APP
+      </div>
+      <div class="note">
+        渲染进程直接通过原生 WebSocket 连接后端；Electron 主进程只负责后端子进程启停与端口透传，不做消息转发。详见 <a href="interface-contracts.md">interface-contracts.md §9</a>。
+      </div>
+    </section>
+
+    <section>
+      <h2>4. 后端核心类图</h2>
+      <div class="mermaid">
+classDiagram
+  namespace EntryTransport {
+    class WsServer {
+      +start(port: number)
+      +broadcast(message: WsMessage)
+    }
+    class MessageRouter {
+      +register(type: string, handler: Handler)
+      +route(message: WsMessage): WsMessage
+    }
+    class CliEntry {
+      +main(argv: string[])
+    }
+  }
+
+  namespace Knowledge {
+    class KnowledgeBaseLoader {
+      +load(rootPath: string): DomainRegistry
+    }
+    class DomainRegistry {
+      +domains: Domain[]
+      +resolve(schemaField: string): MappingEntry
+      +activeDomain: Domain
+    }
+    class Domain {
+      +id: string
+      +styleCatalog: StyleCatalog
+      +parameterDictionary: ParameterDictionary
+      +fewShotExamples: Example[]
+      +modificationRules: Rule[]
+    }
+    class MappingTable {
+      +schemaField: string
+      +geoStylerField: string
+      +cssName: string
+      +defaultValue: any
+    }
+  }
+
+  namespace LLM {
+    class LlmClient {
+      <<interface>>
+      +complete(prompt: Prompt): Promise~string~
+    }
+    class AnthropicClient {
+      +complete(prompt: Prompt): Promise~string~
+    }
+    class OpenAiClient {
+      +complete(prompt: Prompt): Promise~string~
+    }
+    class LocalModelClient {
+      +complete(prompt: Prompt): Promise~string~
+    }
+    class PromptBuilder {
+      +build(context: BuildContext): Prompt
+    }
+    class StyleParamsValidator {
+      +validate(params: unknown): ValidationResult
+    }
+  }
+
+  namespace StyleBuilding {
+    class StyleBuilder {
+      <<abstract>>
+      +build(params: StyleParams): Style
+    }
+    class SimpleStyleBuilder {
+      +build(params: StyleParams): Style
+    }
+    class CategorizedStyleBuilder {
+      +build(params: StyleParams): Style
+    }
+    class ClassifiedStyleBuilder {
+      +build(params: StyleParams): Style
+    }
+    class TextStyleBuilder {
+      +build(params: StyleParams): Style
+    }
+    class DefaultValueResolver {
+      +resolve(kind: string, field: string): any
+    }
+  }
+
+  namespace RuleGeneration {
+    class RuleGenerator {
+      +generateCategorized(field: string, values: any[], ramp: string[]): Rule[]
+      +generateClassified(field: string, method: ClassificationMethod, classes: number, ramp: string[], schema: DataSchema): Rule[]
+    }
+    class ColorRampGenerator {
+      +interpolate(colors: string[], steps: number): string[]
+    }
+    class DataSchema {
+      +properties: Property[]
+      +sample(feature: Feature): any
+    }
+  }
+
+  namespace SldService {
+    class SldParserWrapper {
+      +writeStyle(style: Style): Promise~string~
+      +readStyle(xml: string): Promise~Style~
+    }
+    class XsdValidator {
+      +validate(xml: string): ValidationResult
+    }
+    class RoundtripValidator {
+      +validate(style: Style, xml: string): ValidationResult
+    }
+    class ValidationReporter {
+      +toValidationReport(results: ValidationResult[]): ValidationReport
+    }
+  }
+
+  namespace Session {
+    class AgentSession {
+      +id: string
+      +currentStyle: Style
+      +lastValidStyle: Style
+      +turns: Turn[]
+      +applyPatch(patches: StylePatch[]): Style
+      +generate(request: GenerateRequest): Promise~GenerationResult~
+      +modify(request: ModifyRequest): Promise~GenerationResult~
+      +rollback()
+    }
+    class StyleSnapshot {
+      +style: Style
+      +sldXml: string
+      +validation: ValidationReport
+      +timestamp: number
+    }
+    class Turn {
+      +instruction: string
+      +params: StyleParams
+      +result: StyleSnapshot
+    }
+  }
+
+  WsServer --> MessageRouter
+  MessageRouter --> AgentSession
+  AgentSession --> KnowledgeBaseLoader
+  AgentSession --> LlmClient
+  AgentSession --> StyleBuilder
+  AgentSession --> SldParserWrapper
+  StyleBuilder --> DefaultValueResolver
+  StyleBuilder --> RuleGenerator
+  RuleGenerator --> ColorRampGenerator
+  SldParserWrapper --> XsdValidator
+  SldParserWrapper --> RoundtripValidator
+  LlmClient <|.. AnthropicClient
+  LlmClient <|.. OpenAiClient
+  LlmClient <|.. LocalModelClient
+  StyleBuilder <|-- SimpleStyleBuilder
+  StyleBuilder <|-- CategorizedStyleBuilder
+  StyleBuilder <|-- ClassifiedStyleBuilder
+  StyleBuilder <|-- TextStyleBuilder
+  DomainRegistry --> Domain
+  Domain --> MappingTable
+      </div>
+    </section>
+
+    <section>
+      <h2>5. 前端核心类图</h2>
+      <div class="mermaid">
+classDiagram
+  namespace ElectronShell {
+    class AppShell {
+      +mounted()
+      +onWindowStateChanged(state: WindowState)
+    }
+    class TitleBar {
+      +minimize()
+      +toggleMaximize()
+      +close()
+    }
+  }
+
+  namespace Stores {
+    class ChatStore {
+      +messages: Message[]
+      +sendInstruction(text: string)
+      +appendAssistantMessage(result: GenerationResult)
+    }
+    class StyleStore {
+      +currentStyle: Style
+      +sldXml: string
+      +validation: ValidationReport
+      +applyPatch(patches: StylePatch[])
+      +updateFromResult(result: GenerationResult)
+    }
+    class SettingsStore {
+      +modelProvider: string
+      +activeDomain: string
+      +apiKey: string
+    }
+  }
+
+  namespace Transport {
+    class WsClient {
+      +connect(url: string)
+      +send(message: WsMessage)
+      +onMessage(handler: Handler)
+    }
+    class IpcRendererAdapter {
+      +invoke(channel: string, ...args): Promise~any~
+    }
+  }
+
+  namespace Map {
+    class MapPreview {
+      +mount(el: HTMLElement)
+      +applyStyle(style: Style)
+      +loadGeojson(geojson: object)
+    }
+    class OlMapController {
+      +map: Map
+      +setStyle(olStyle: any)
+    }
+    class SampleDataSource {
+      +getSampleFeatures(geometryType: string): Feature[]
+    }
+  }
+
+  namespace Editors {
+    class RulesPanel {
+      +rules: Rule[]
+      +reorderRules(from: number, to: number)
+      +removeRule(index: number)
+      +duplicateRule(index: number)
+    }
+    class RuleEditor {
+      +rule: Rule
+      +updateSymbolizer(symbolizer: Symbolizer)
+      +updateScaleDenominator(min?: number, max?: number)
+    }
+    class FilterEditor {
+      +filter: Filter
+      +addComparison(operator: string, property: string, value: any)
+      +addLogical(operator: 'and' | 'or')
+    }
+    class SymbolizerEditor {
+      +symbolizer: Symbolizer
+      +updateField(field: string, value: any)
+    }
+  }
+
+  namespace FileIO {
+    class FileService {
+      +openFile(filters: FileFilter[]): Promise~string~
+      +saveFile(content: string, filters: FileFilter[]): Promise~string~
+    }
+    class RecentFilesService {
+      +add(path: string, type: FileType)
+      +list(): RecentFile[]
+    }
+    class SldParserService {
+      +readStyle(xml: string): Promise~Style~
+      +writeStyle(style: Style): Promise~string~
+    }
+  }
+
+  AppShell --> TitleBar
+  AppShell --> ChatStore & StyleStore
+  ChatStore --> WsClient
+  StyleStore --> MapPreview & RulesPanel & Inspector
+  RulesPanel --> RuleEditor
+  RuleEditor --> FilterEditor & SymbolizerEditor
+  RuleEditor --> StyleStore
+  MapPreview --> OlMapController --> SampleDataSource
+  FileService --> IpcRendererAdapter
+  SldParserService --> StyleStore
+      </div>
+      <div class="note">
+        <code>WsClient</code> 直接连接后端 WebSocket；<code>IpcRendererAdapter</code> 仅用于文件选择、窗口控制等 Electron 原生能力，不转发 WS 消息。<code>BackendProcessManager</code> 属于 Electron 主进程，负责启动/停止后端子进程，不在渲染进程类图中。
+      </div>
+    </section>
+
+    <section>
+      <h2>6. 共享契约（Shared Contracts）</h2>
+      <div class="mermaid">
+classDiagram
+  namespace SharedContracts {
+    class WsMessage {
+      +type: string
+      +id: string
+      +payload: object
+    }
+    class GenerateRequest {
+      +instruction: string
+      +geometryType: string
+      +domain?: string
+      +dataSchema?: DataSchema
+    }
+    class ModifyRequest {
+      +instruction: string
+      +preserve?: string[]
+    }
+    class ApplyPatchRequest {
+      +patches: StylePatch[]
+    }
+    class ExportRequest {
+      +style: Style
+      +options: ExportOptions
+    }
+    class GenerationResult {
+      +style: Style
+      +sldXml: string
+      +params: StyleParams
+      +validation: ValidationReport
+      +explanation: string
+    }
+    class ValidationReport {
+      +passed: boolean
+      +xsd?: ValidationResult
+      +roundtrip?: ValidationResult
+      +schema?: ValidationResult
+      +errors: ValidationError[]
+    }
+    class StyleParams {
+      +style_name: string
+      +geometry_type: string
+      +style_type: string
+      +field_name?: string
+      +stroke_color?: string
+      +stroke_width?: number
+      +stroke_dasharray?: string
+      +fill_color?: string
+      +opacity?: number
+      +color_ramp?: string[]
+    }
+  }
+      </div>
+      <div class="note">
+        建议把这些类型放在 <code>SourceCode/shared</code> 或 <code>packages/shared</code> 中，前后端通过同一 TypeScript 源码共享，避免字段名、nullable 标记漂移。
+      </div>
+    </section>
+
+    <section>
+      <h2>7. 关键场景数据流</h2>
+
+      <h3>7.1 自然语言生成新样式</h3>
+      <div class="mermaid">
+sequenceDiagram
+  autonumber
+  participant U as 用户
+  participant F as Vue 前端
+  participant W as WsClient
+  participant R as MessageRouter
+  participant S as AgentSession
+  participant K as KnowledgeBaseLoader
+  participant L as LlmClient
+  participant V as StyleParamsValidator
+  participant B as StyleBuilder
+  participant P as SldService
+
+  U->>F: 输入“蓝色渐变虚线”
+  F->>W: send({type:'generate', ...})
+  W->>R: route
+  R->>S: handleGenerate
+  S->>K: 加载 activeDomain 知识
+  S->>L: 注入 Prompt
+  L-->>S: StyleParams (JSON)
+  S->>V: validate(params)
+  alt 校验失败
+    S-->>W: 返回错误
+    W-->>F: 显示错误
+  else 校验通过
+    S->>B: build(params)
+    B-->>S: GeoStyler Style
+    S->>P: writeStyle + XSD/roundtrip 校验
+    alt 校验失败
+      S->>S: rollback()
+      S-->>W: 返回错误
+    else 校验通过
+      S->>S: currentStyle = newStyle<br/>lastValidStyle = newStyle
+      S-->>W: GenerationResult
+      W-->>F: 更新 Inspector / Map / Rules
+    end
+  end
+      </div>
+
+      <h3>7.2 多轮增量修改</h3>
+      <div class="mermaid">
+sequenceDiagram
+  autonumber
+  participant U as 用户
+  participant F as Vue 前端
+  participant W as WsClient
+  participant S as AgentSession
+  participant K as KnowledgeBaseLoader
+  participant L as LlmClient
+  participant B as StyleBuilder
+  participant P as SldService
+
+  U->>F: “把线宽改为 3”
+  F->>W: send({type:'modify', instruction})
+  W->>S: handleModify
+  S->>K: 加载 modification_rules
+  S->>L: Prompt + 完整 StyleParams
+  L-->>S: StyleParams（仅变更 + preserve）
+  S->>B: build(params, currentStyle)
+  B-->>S: newStyle
+  S->>P: writeStyle + 校验
+  alt 失败
+    S->>S: currentStyle = lastValidStyle
+    S-->>F: 错误 + 回退提示
+  else 成功
+    S->>S: lastValidStyle = newStyle<br/>currentStyle = newStyle
+    S-->>F: GenerationResult
+  end
+      </div>
+
+      <h3>7.3 参数化精修提交（apply_patch）</h3>
+      <div class="mermaid">
+sequenceDiagram
+  autonumber
+  participant U as 用户
+  participant E as RuleEditor
+  participant ST as StyleStore
+  participant W as WsClient
+  participant S as AgentSession
+  participant P as SldService
+
+  U->>E: 在参数面板完成一组修改
+  E->>ST: 本地乐观更新（临时）
+  U->>E: 点击“应用”
+  E->>W: send({type:'apply_patch', patches})
+  W->>S: handleApplyPatch
+  S->>S: applyPatches → newStyle
+  S->>P: writeStyle + 校验
+  alt 失败
+    S-->>ST: 错误
+    ST->>ST: 撤销本地乐观更新
+  else 成功
+    S->>S: lastValidStyle = newStyle
+    S-->>ST: GenerationResult
+    ST->>E: 同步最新 Rule 状态
+  end
+      </div>
+
+      <h3>7.4 导入已有 SLD</h3>
+      <div class="mermaid">
+sequenceDiagram
+  autonumber
+  participant U as 用户
+  participant F as Vue 前端
+  participant FS as FileService
+  participant PS as SldParserService
+  participant W as WsClient
+  participant S as AgentSession
+  participant P as SldService
+
+  U->>F: 选择 .sld 文件
+  F->>FS: openFile
+  FS-->>F: sldXml
+  F->>PS: readStyle(sldXml)
+  alt 解析失败
+    PS-->>F: 错误
+    F->>F: ValidationPanel 显示原因
+  else 解析成功
+    F->>W: send({type:'import_style', style})
+    W->>S: handleImport
+    S->>P: writeStyle + 校验
+    S->>S: currentStyle = style<br/>lastValidStyle = style
+    S-->>F: GenerationResult
+    F->>F: 更新 Map / Rules / Inspector
+  end
+      </div>
+    </section>
+
+    <section>
+      <h2>8. 已落地设计与后续待定点</h2>
+      <p>以下模块已在 design 文档中详细定义：</p>
+      <ul>
+        <li><strong>Filter 编辑器</strong>：详见 <a href="filter-editor.md">filter-editor.md</a>。</li>
+        <li><strong>多轮修改协议</strong>：详见 <a href="agent-session.md">agent-session.md §6</a>。</li>
+        <li><strong>xmllint 打包与降级</strong>：详见 <a href="xmllint-packaging.md">xmllint-packaging.md</a> 与 <a href="sld-service.md">sld-service.md §6</a>。</li>
+      </ul>
+      <p>真正尚未定稿、需要后续详细设计的点：</p>
+      <ul>
+        <li><strong>分类 / 分级无数据场景</strong>：LLM 直接给出断点 / 唯一值，还是拒绝生成？</li>
+        <li><strong>多 Symbolizer 混合</strong>：同一 Rule 中 Fill + Text / Line + Text 的组合规则与 Builder 支持。</li>
+        <li><strong>栅格样式（RasterSymbolizer）</strong>：是否作为独立 Builder，以及 <code>colorMap</code>、<code>contrast</code> 等字段的 Schema 定义。</li>
+        <li><strong>Session 持久化</strong>：MVP 不持久化，后续是否保存当前 Style 与聊天历史到本地文件。</li>
+      </ul>
+    </section>
+  </main>
+
+  <script>
+    mermaid.initialize({ startOnLoad: true, theme: 'dark' });
+  </script>
+</body>
+</html>
