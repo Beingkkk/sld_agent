@@ -1,0 +1,84 @@
+{
+  "version": "1.0.0",
+  "description": "Symbolizer 种类的字段组合与分组定义。kind 与 GeoStyler 原生命名对齐；userLabel 用于前端 UI 展示。fields 中的 id 引用 field-registry.json 中的字段定义。",
+  "symbolizers": {
+    "Mark": {
+      "kind": "Mark",
+      "userLabel": "点符号",
+      "description": "使用 WellKnownName 形状（如圆、方）渲染点要素。",
+      "groups": [
+        {
+          "id": "geometry",
+          "label": "几何",
+          "fields": ["markWellKnownName", "markRadius", "markRotate"]
+        },
+        {
+          "id": "fill",
+          "label": "填充",
+          "fields": ["markFillColor", "markFillOpacity"]
+        },
+        {
+          "id": "stroke",
+          "label": "描边",
+          "fields": ["markStrokeColor", "markStrokeWidth", "markStrokeOpacity"]
+        }
+      ]
+    },
+    "Line": {
+      "kind": "Line",
+      "userLabel": "线符号",
+      "description": "渲染线要素，支持颜色、宽度、虚线模式。",
+      "groups": [
+        {
+          "id": "appearance",
+          "label": "外观",
+          "fields": ["lineColor", "lineWidth", "lineOpacity"]
+        },
+        {
+          "id": "pattern",
+          "label": "线型",
+          "fields": ["lineDasharray", "lineCap", "lineJoin"]
+        }
+      ]
+    },
+    "Fill": {
+      "kind": "Fill",
+      "userLabel": "面符号",
+      "description": "渲染面要素，支持填充、描边。",
+      "groups": [
+        {
+          "id": "fill",
+          "label": "填充",
+          "fields": ["fillColor", "fillOpacity"]
+        },
+        {
+          "id": "outline",
+          "label": "描边",
+          "fields": ["fillOutlineColor", "fillOutlineWidth", "fillOutlineOpacity", "fillOutlineDasharray"]
+        }
+      ]
+    },
+    "Text": {
+      "kind": "Text",
+      "userLabel": "文字标注",
+      "description": "根据属性字段渲染文本标注。",
+      "groups": [
+        {
+          "id": "label",
+          "label": "标注",
+          "fields": ["textLabel", "textFont", "textSize", "textColor", "textFontWeight", "textFontStyle"]
+        },
+        {
+          "id": "placement",
+          "label": "位置",
+          "fields": ["textAnchor", "textOffset"]
+        },
+        {
+          "id": "halo",
+          "label": "光晕",
+          "fields": ["textHaloColor", "textHaloWidth"]
+        }
+      ]
+    }
+  }
+}

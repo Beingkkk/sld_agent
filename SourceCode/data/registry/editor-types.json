@@ -1,0 +1,71 @@
+{
+  "version": "1.0.0",
+  "description": "抽象编辑器控件类型定义。前端根据 component 名映射到对应 Vue 组件，后端 LLM 根据 valueType 理解字段取值类型。",
+  "editors": {
+    "string": {
+      "component": "StringEditor",
+      "valueType": "string",
+      "defaultProps": {}
+    },
+    "textarea": {
+      "component": "TextareaEditor",
+      "valueType": "string",
+      "defaultProps": { "rows": 3 }
+    },
+    "number": {
+      "component": "NumberEditor",
+      "valueType": "number",
+      "defaultProps": { "step": 1 }
+    },
+    "opacity": {
+      "component": "OpacityEditor",
+      "valueType": "number",
+      "defaultProps": { "min": 0, "max": 1, "step": 0.1 }
+    },
+    "color": {
+      "component": "ColorEditor",
+      "valueType": "string",
+      "defaultProps": {}
+    },
+    "enum": {
+      "component": "EnumEditor",
+      "valueType": "string",
+      "defaultProps": {}
+    },
+    "tags": {
+      "component": "TagsEditor",
+      "valueType": "array",
+      "defaultProps": {}
+    },
+    "boolean": {
+      "component": "BooleanEditor",
+      "valueType": "boolean",
+      "defaultProps": {}
+    },
+    "scale-range": {
+      "component": "ScaleRangeEditor",
+      "valueType": "object",
+      "defaultProps": {}
+    },
+    "point2d": {
+      "component": "Point2DEditor",
+      "valueType": "object",
+      "defaultProps": {}
+    },
+    "number-array": {
+      "component": "NumberArrayEditor",
+      "valueType": "array",
+      "defaultProps": {}
+    },
+    "filter-tree": {
+      "component": "FilterEditor",
+      "valueType": "object",
+      "defaultProps": {}
+    },
+    "font": {
+      "component": "FontEditor",
+      "valueType": "string",
+      "defaultProps": {}
+    }
+  }
+}

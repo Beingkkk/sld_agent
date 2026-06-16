@@ -1,37 +1,59 @@
-# Constitution — SLDAgent 最高约束
+# SLDAgent 宪法（Constitution）
 
-> 文档定位：SDD 最高效力层，极少变更。所有 spec、plan、代码不得与本文件冲突。
+> 版本：v1.0.0  
+> 生效日期：2026-06-16  
+> 修改流程：需经项目负责人书面同意，并在 `Document/changes/` 中创建 Type-A 提案。
 
 ---
 
-## 1. 愿景
+## 1. 项目愿景
 
-SLDAgent 致力于让非专业用户也能通过自然语言与可视化参数精修，生成符合 OGC SLD 1.0.0 标准、可被 GeoServer 直接接受的样式文件。
+SLDAgent 是一个面向 GIS 专业人员与开发者的桌面端 SLD（Styled Layer Descriptor）智能样式编辑器。通过可视化树形编辑、实时预览与 AI 辅助，降低手写 SLD XML 的门槛，让样式设计成为“所见即所得”的高效工作流。
 
-## 2. 红色条款
+## 2. 核心设计原则
 
-| 编号 | 约束 |
-|---|---|
-| C-01 | SLD 输出版本必须严格兼容 **OGC SLD 1.0.0**。 |
-| C-02 | 后端是权威状态源；前端通过 `apply_patch` 提交结构化修改。 |
-| C-03 | 任一生成/修改/导入阶段失败必须回退到上一有效状态，不得产生无效中间状态。 |
-| C-04 | LLM 输出必须先通过 JSON Schema 校验，再做字段别名归一化。 |
-| C-05 | 不使用 RAG；知识以预结构化 JSON 注入 LLM 上下文。 |
-| C-06 | 同一时刻只激活一个业务领域。 |
-| C-07 | SLD XML 对用户只读；用户编辑对象是 GeoStyler Style 中间表示。 |
-| C-08 | 所有需求变更必须更新 `Document/spec.md` 或创建 `Document/changes/proposal-*.md`；禁止直接修改已锁定的 plan。 |
-| C-09 | 项目文档与协作输出使用**中文**；技术术语、代码、文件路径与外部引用保持原样。 |
+| 编号 | 原则 | 说明 |
+| :--- | :--- | :--- |
+| **CP-1** | **GeoStyler 为中间模型** | 前后端统一以 `geostyler-style` 为数据基准，最终 SLD XML 必须由 `geostyler-sld-parser` 生成，禁止手写 XML 构造器。 |
+| **CP-2** | **单向数据流** | 树状态 Store 是唯一真相源。任何 UI 操作先更新 Store，再由 Transformer 同步生成 GeoStyler JSON 与 SLD XML。 |
+| **CP-3** | **离线优先** | MVP 必须能在无外部地图服务的情况下完成核心编辑与预览；依赖的 Sample 数据内置在本地。 |
+| **CP-4** | **AI 仅作副驾驶** | LLM 只输出自然语言解释与建议，不直接修改树状态；最终决策权在用户。 |
+| **CP-5** | **前后端同构解析** | 前端与后端使用同一版本的 `geostyler-sld-parser`，由单一 lock 文件统一管理。 |
 
-## 3. 质量门禁
+## 3. 技术栈约束
 
-- 所有公共接口必须在对应 plan 的「接口定义」章节中声明。
-- 所有新增代码必须有对应单元测试。
-- 所有提交必须通过 `tsc --noEmit` 与 `eslint`。
-- 所有 P0 功能必须有端到端或集成测试覆盖。
+- **前端框架**：Vue 3 + TypeScript
+- **样式方案**：Tailwind CSS
+- **地图渲染**：OpenLayers + `geostyler-openlayers-parser`
+- **SLD 解析**：`geostyler-sld-parser`
+- **后端运行时**：Node.js >= 20.6.0 + TypeScript
+- **桌面封装**：Electron
+- **前后端通信**：开发与生产均使用 WebSocket；IPC 仅用于窗口控制与文件对话框
 
-## 4. 版本历史
+## 4. 红色条款（不可违反）
 
-| 版本 | 日期 | 说明 |
-|---|---|---|
-| 1.0.0 | 2026-06-15 | 初始 constitution |
-| 1.0.1 | 2026-06-15 | 新增 C-09 项目文档语言规范 |
+1. 禁止无 plan 直接编码。
+2. 禁止 plan 与代码不一致。
+3. 禁止未经 proposal 直接修改已锁定的 spec 或 plan。
+4. 禁止需求变更不更新 spec。
+5. 禁止先实现后补测试。
+6. 禁止在源码中硬编码 API Key、LLM endpoint 等敏感信息。
+7. 禁止引入 GeoStyler React UI 主包或 Ant Design。
+
+## 5. 文档效力层级
+
+```text
+constitution.md > spec.md > plan-{module}.md > changes/proposal-*.md > source code
+```
+
+- `constitution.md`：极少变更，项目级最高约束。
+- `spec.md`：需求真相源，所有功能必须能追溯至此。
+- `plan-{module}.md`：模块设计唯一依据，锁定后不可直接修改。
+- `changes/proposal-*.md`：活跃变更，必须经过审阅与归档。
+
+## 6. 质量门禁
+
+- 所有公共接口必须在 plan 中定义。
+- 新增代码必须伴随单元测试或集成测试。
+- 提交前必须通过类型检查与格式化检查。
+- 每次归档前必须运行 `/sdd-verify`。
