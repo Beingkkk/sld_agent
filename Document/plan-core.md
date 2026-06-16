@@ -43,8 +43,12 @@ class SLDTree {
   
   // 派生数据
   toGeoStyler(): GeoStylerStyle;
+  // 每个 FeatureTypeStyle 单独调用 parser.writeStyle() 生成 SLD 片段，
+  // 再由 fast-xml-parser 后处理拼接为完整 SLD XML。
   toSLDXML(): string;
   static fromGeoStyler(style: GeoStylerStyle): SLDTree;
+  // 先用 fast-xml-parser 解析 SLD XML 结构，按 FeatureTypeStyle 边界切分，
+  // 再调用 parser.readStyle() 将每个片段转为 GeoStyler Style，最后还原为树。
   static fromSLDXML(xml: string): Promise<SLDTree>;
   
   // 校验
@@ -95,11 +99,12 @@ class TreePath {
 
 ```typescript
 class GeoStylerTransformer {
-  // 树 → GeoStyler Style（FeatureTypeStyle 扁平化）
+  // 树 → GeoStyler Style（FeatureTypeStyle 扁平化：每个 FTS 生成独立 GeoStyler Style）
   static toGeoStyler(tree: SLDRoot): GeoStylerStyle;
   
-  // GeoStyler Style → 树（为每个 Rule 包裹默认 FeatureTypeStyle）
-  static fromGeoStyler(style: GeoStylerStyle): SLDRoot;
+  // GeoStyler Style → 树（按导入时记录的 FeatureTypeStyle 边界还原；
+  // 若无法还原，则为所有 rules 包裹默认 FeatureTypeStyle）
+  static fromGeoStyler(style: GeoStylerStyle, featureTypeStyleMeta?: FeatureTypeStyleMeta[]): SLDRoot;
 }
 
 class SymbolizerTransformer {
@@ -123,15 +128,22 @@ class SymbolizerTransformer {
 | `Mark` | `markRotate` | `rotate` | 旋转角度 |
 | `Line` | `lineColor` | `color` | 线颜色 |
 | `Line` | `lineWidth` | `width` | 线宽度 |
-| `Line` | `lineDasharray` | `dasharray` | 虚线模式 |
+| `Line` | `lineDasharray` | `dasharray` | 虚线模式；UI 用 `line-style` 枚举，Core 映射为数组 |
+| `Line` | `lineCap` | `cap` | 线端样式 |
+| `Line` | `lineJoin` | `join` | 连接样式 |
 | `Fill` | `fillColor` | `color` | 填充颜色 |
+| `Fill` | `fillOpacity` | `fillOpacity` | 填充不透明度 |
 | `Fill` | `fillOutlineColor` | `outlineColor` | 描边颜色 |
 | `Fill` | `fillOutlineWidth` | `outlineWidth` | 描边宽度 |
-| `Text` | `textLabel` | `label` | 标注字段 |
+| `Fill` | `fillOutlineOpacity` | `outlineOpacity` | 描边不透明度 |
+| `Fill` | `fillOutlineDasharray` | `outlineDasharray` | 描边虚线模式 |
+| `Text` | `textLabel` | `label` | 标注字段；UI 用 `property-name` 下拉 |
 | `Text` | `textFont` | `font[0]` | 字体（数组首项） |
 | `Text` | `textSize` | `size` | 字号 |
 | `Text` | `textColor` | `color` | 文字颜色 |
-| `Text` | `textAnchor` | `anchor` | 锚点 |
+| `Text` | `textFontWeight` | `fontWeight` | 字重 |
+| `Text` | `textFontStyle` | `fontStyle` | 字体样式 |
+| `Text` | `textAnchor` | `anchor` | 锚点；UI 用 `point2d` `{x, y}`，Core 映射为 `[x, y]` |
 | `Text` | `textOffset` | `offset` | `{x, y}` → `[x, y]` |
 | `Text` | `textHaloColor` | `haloColor` | 光晕颜色 |
 | `Text` | `textHaloWidth` | `haloWidth` | 光晕宽度 |
@@ -144,9 +156,10 @@ class SymbolizerTransformer {
 3. 若存在直接对应关系，则 `geoStylerSymbolizer[geoStylerPath] = value`；
 4. 特殊字段由 `SymbolizerTransformer` 显式处理：
    - `textFont` → `font = [value]`
+   - `textAnchor` → `anchor = [value.x, value.y]`
    - `textOffset` → `offset = [value.x, value.y]`
-
-`scaleDenominator` 与 `filter` 分别由 `GeoStylerTransformer` 与 `FilterTransformer` 处理，不属于 `SymbolizerTransformer` 职责范围。
+   - `lineDasharray` 为字符串枚举时映射为 number[]：`solid → []`、`dashed → [6, 4]`、`dotted → [2, 4]`；
+     若已经是数组则直接透传（保留高级模式扩展）。
 
 ### 2.4 `ValidationEngine`
 
@@ -201,8 +214,10 @@ interface TransformResult {
 用户操作（前端）
   → `Store.update(...)` 调用 `SLDTree` 不可变方法
   → 生成新的 `TreeStateSnapshot`
-  → `GeoStylerTransformer.toGeoStyler()` 生成 GeoStyler Style
-  → `geostyler-sld-parser.writeStyle()` 生成 SLD XML
+  → `GeoStylerTransformer.toGeoStyler()` 为每个 FeatureTypeStyle 生成独立 GeoStyler Style
+  → `geostyler-sld-parser.writeStyle()` 生成各 FeatureTypeStyle 的 SLD 片段
+  → `fast-xml-parser` 后处理：组装 NamedLayer / UserStyle / 多 FeatureTypeStyle 容器，补回 title / abstract / featureTypeName 等扩展字段
+  → 产出完整 SLD XML
   → `ValidationEngine.validate()` 产出校验问题
   → 前端同步刷新树、代码区、校验面板、预览
 
@@ -213,9 +228,10 @@ interface TransformResult {
 | 树状态是否可序列化？ | 是，作为 JSON 保存到文件 / 后端上下文 | 便于导入导出与 LLM 多轮上下文。 |
 | Symbolizer kind 命名 | 对齐 GeoStyler 原生类型（`Mark` / `Line` / `Fill` / `Text`），UI 层用 `userLabel` 做中文展示 | 与 parser 输入输出一致，减少转换歧义。 |
 | NamedLayer / UserStyle 数量 | MVP 仅允许各一个；多容器 SLD 导入时保留第一个并 warning | 降低 UI 与状态管理复杂度。 |
-| FeatureTypeStyle 在 GeoStyler 中如何处理？ | 扁平化合并所有 rules；导入时按单 FTS 还原 | GeoStyler Style 顶层无 FTS 概念。 |
+| FeatureTypeStyle 在 GeoStyler 中如何处理？ | **parser 分片 + XML 后处理**：导出时每个 FTS 单独生成 SLD 片段，再用 `fast-xml-parser` 拼接为完整 SLD；导入时先用 `fast-xml-parser` 解析 XML 结构，按 FTS 边界切分后再调用 parser 读取 | GeoStyler Style 顶层无 FTS 概念，但必须保留多 FTS 容器与元数据。 |
+| 扩展字段如何保留？ | 存储在 SLD 树对象中；导出时用 `fast-xml-parser` 在 parser 生成的片段基础上补充 title/abstract/featureTypeName 等节点；导入时从 XML 提取并写回树节点 | GeoStyler JSON 不直接支持 title/abstract/featureTypeName。 |
+| XML 后处理库 | `fast-xml-parser` | 体积小、性能好、支持命名空间与双向转换。 |
 | 树 → GeoStyler 字段映射 | 树节点字段保持语义化 ID，由 `SymbolizerTransformer` 按 kind 映射到 GeoStyler 扁平字段 | 兼容 SLD XML 语义与 GeoStyler 数据模型；映射规则集中、可单测。 |
-| 扩展字段如何保留？ | 存储在 SLD 树对象中，生成 SLD 后处理补充 | GeoStyler JSON 不直接支持 title/abstract/featureTypeName。 |
 | 校验时机？ | 每次树更新后全量校验，结果进入 Store | 保证代码区与校验面板实时一致。 |
 | 模块组织 | Core 作为 monorepo workspace package | 被 frontend/backend 共享，避免代码复制。 |
 | Parser 版本管理 | `geostyler-sld-parser` 等共享依赖在 root `package.json` 中统一声明，各 workspace 引用同一版本 | 保证前后端对 SLD 的理解一致（CP-5）。 |
@@ -241,5 +257,6 @@ interface TransformResult {
 ## 8. 风险与依赖
 
 - **依赖 `geostyler-sld-parser` 版本**：必须与 plan-frontend 和 plan-backend 协商统一版本。
-- **扩展字段丢失风险**：生成 SLD 时若后处理遗漏，会导致 UserStyle/FTS 元数据丢失，需通过 example-sld.xml 回归测试覆盖。
+- **扩展字段丢失风险**：生成 SLD 时若 `fast-xml-parser` 后处理遗漏，会导致 UserStyle/FTS 元数据丢失，需通过 example-sld.xml 回归测试覆盖。
+- **FeatureTypeStyle 边界还原风险**：导入复杂 SLD 时，parser 分片 + XML 后处理必须严格保留 FTS 顺序与层级，需端到端 fixtures 覆盖。
 - **性能风险**：树较深时全量转换可能引入延迟，必要时引入增量转换或 memoization（后续优化）。

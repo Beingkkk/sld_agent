@@ -57,6 +57,11 @@
       "valueType": "array",
       "defaultProps": {}
     },
+    "line-style": {
+      "component": "LineStyleEditor",
+      "valueType": "string",
+      "defaultProps": {}
+    },
     "filter-tree": {
       "component": "FilterEditor",
       "valueType": "object",
@@ -66,6 +71,11 @@
       "component": "FontEditor",
       "valueType": "string",
       "defaultProps": {}
+    },
+    "property-name": {
+      "component": "PropertyNameEditor",
+      "valueType": "string",
+      "defaultProps": { "source": "sample-geojson-properties" }
     }
   }
 }

@@ -45,7 +45,7 @@ Frontend 模块负责三栏桌面界面：左侧 SLD 树、中间属性编辑 + 
 ### 2.2 `SLDTreePanel`
 
 - 渲染 `SLDTreeNode` 递归列表。
-- 节点标题**仅显示完整 XML 标签名**（如 `sld:NamedLayer`、`sld:PointSymbolizer`），不额外显示 GeoStyler kind 或中文语义。
+- 节点标题**仅显示简化 XML 标签名**（如 `NamedLayer`、`UserStyle`、`PointSymbolizer`），不额外显示 GeoStyler kind 或中文语义。
 - 不同节点类型通过图标和颜色区分（见 [`Document/UX/design.md`](Document/UX/design.md) §4.2）。
 - 维护 `selectedPath`、`expandedPaths`。
 - 右键菜单：`Add Rule`、`Add Symbolizer`、`Delete`。
@@ -56,16 +56,16 @@ Symbolizer 节点显示的 XML 标签与 GeoStyler kind 的对应关系：
 
 | GeoStyler kind | 树上显示的 XML 标签 |
 | :--- | :--- |
-| `Mark` | `sld:PointSymbolizer` |
-| `Line` | `sld:LineSymbolizer` |
-| `Fill` | `sld:PolygonSymbolizer` |
-| `Text` | `sld:TextSymbolizer` |
+| `Mark` | `PointSymbolizer` |
+| `Line` | `LineSymbolizer` |
+| `Fill` | `PolygonSymbolizer` |
+| `Text` | `TextSymbolizer` |
 
 ### 2.3 `EditorPanel`
 
 - 上半部分：`PropertyForm`（根据 `selectedPath` 的节点类型动态渲染）。
 - 下半部分：`MapPreview`（OpenLayers 地图）。
-- 可选：右侧悬浮 `LLMPropertyChat` 卡片。
+- 可选悬浮 `LLMPropertyChat` 卡片：触发源为属性面板内当前选中的字段，用于解释该字段含义与用法。
 
 ### 2.4 `PropertyForm`（JSON 驱动 + 分组）
 
@@ -90,7 +90,7 @@ selectedPath
 | `PropertyForm` | 根据节点类型获取 schema；`symbolizer-schemas.json` 按 `groups` 渲染折叠分组，`node-schemas.json` 按 `fields` 渲染默认分组。 |
 | `FormFieldRenderer` | 根据字段 `editor` 类型分发到具体编辑器组件。 |
 | `PropertyGroup` | 可折叠分组容器，聚合 symbolizer schema 中定义的字段。 |
-| `StringEditor` / `NumberEditor` / `ColorEditor` / `EnumEditor` / `BooleanEditor` / `TextareaEditor` / `OpacityEditor` / `ScaleRangeEditor` / `Point2DEditor` / `NumberArrayEditor` / `FontEditor` / `FilterEditor` | 通用编辑器控件，由 `editor-types.json` 定义。 |
+| `StringEditor` / `NumberEditor` / `ColorEditor` / `EnumEditor` / `BooleanEditor` / `TextareaEditor` / `OpacityEditor` / `ScaleRangeEditor` / `Point2DEditor` / `NumberArrayEditor` / `FontEditor` / `FilterEditor` / `LineStyleEditor` / `PropertyNameEditor` | 通用编辑器控件，由 `editor-types.json` 定义。 |
 
 字段值写回 Store 时，按 `field.valuePath` 写入树节点字段；树 → GeoStyler 的转换由 Core `SymbolizerTransformer` 负责，前端不直接处理 GeoStyler 字段映射。
 
@@ -103,7 +103,11 @@ selectedPath
 - `SourceCode/data/registry/node-schemas.json`
 - `SourceCode/data/registry/symbolizer-schemas.json`
 
-### 2.5 `MapPreview`
+### 2.4.2 Rule 面板中的 Filter 与 CQL
+
+- Rule 的 Filter 通过 `filter-tree` editor（`FilterEditor`）进行可视化编辑。
+- Rule 面板中同时展示当前 Filter 的 **CQL 文本预览**，该文本框**只读**，用于帮助用户理解可视化条件对应的 CQL 表达式。
+- 若用户需要修改 Filter，必须回到可视化构造器；CQL 预览不直接接受输入。
 
 ```typescript
 interface MapPreviewProps {
@@ -116,7 +120,8 @@ interface MapPreviewProps {
 - 预览数据来自 `SourceCode/data/sample/` 下的内置 **GeoJSON**（由 shapefile 预转换），MVP 阶段直接读取本地文件，不上传。
 - `previewGeometryType` 默认由当前选中节点推导：
   - 选中 Symbolizer → 使用其 `kind`。
-  - 选中 Rule / FeatureTypeStyle / UserStyle → 回退到该节点下第一个 Symbolizer 的 `kind`；无 Symbolizer 时默认 `Mark`。
+  - 选中 Rule → 回退到该 Rule 下第一个 Symbolizer 的 `kind`；无 Symbolizer 时默认 `Fill`。
+  - 选中 FeatureTypeStyle / UserStyle / NamedLayer / 根节点 → 使用用户最近一次手动选择；从未手动选择时默认 `Fill`。
 - **保留手动切换按钮**（点 / 线 / 面 / 文本），便于用户临时查看其他几何类型的效果。
 - Text Symbolizer 预览使用内置点 Sample 数据；若数据中存在 `name` 字段则用作 label，否则仅显示占位提示（不渲染文本）。
 - Raster Symbolizer 预览不在 MVP 范围内（见 §6 决策）。
@@ -201,13 +206,14 @@ Frontend 直接导入 Core 包中的类：
 | 拖拽库 | `@vueuse/gesture` 或原生 HTML5 Drag & Drop | 原生足够，避免引入过重库。 |
 | 代码高亮 | `highlight.js` | 轻量，支持 JSON/XML。 |
 | OpenLayers 包装 | 直接封装 `MapPreview` 组件 | 控制力强，便于与 geostyler-openlayers-parser 集成。 |
-| 预览数据切换 | 自动推导 + **保留手动切换按钮**（点/线/面/文本） | 兼顾自动化与临时查看需求。 |
+| 预览数据切换 | 自动推导 + **保留手动切换按钮**（点/线/面/文本）；手动选择会覆盖自动推导，并在选中更高级节点时保留 | 兼顾自动化与临时查看需求。 |
 | 预览数据来源 | 读取 `SourceCode/data/sample/` 内置 **GeoJSON**（shapefile 预转换） | 离线优先，OpenLayers 原生支持 GeoJSON。 |
 | 主题方案 | MVP 仅暗色主题，不实现亮/暗切换 | 降低实现成本，符合 UX 原型。 |
 | 字体加载 | 本地 TTF 文件，离线优先 | 符合宪法 CP-3；避免外部 CDN 依赖。 |
-| 树节点标签 | 显示完整 XML 标签名（如 `sld:NamedLayer`），不显示 kind 或中文语义 | 满足专业用户对 SLD 层级的直观认知；图标/颜色区分类型。 |
+| 树节点标签 | 显示简化 XML 标签名（如 `NamedLayer`、`PointSymbolizer`），不显示 `sld:` 前缀、kind 或中文语义 | 满足专业用户对 SLD 层级的直观认知；图标/颜色区分类型；与 UX 原型一致。 |
 | NamedLayer / UserStyle 数量 | MVP 仅允许各一个 | 降低多容器管理的 UI 与状态复杂度。 |
-| AI 面板 | 右侧面板底部独立卡片，琥珀色左边框，可折叠 | 与 UX 原型一致。 |
+| AI 面板 | 右侧面板底部独立卡片，琥珀色左边框，可折叠；**AI 不直接修改树** | 与 UX 原型一致；符合宪法 CP-4。 |
+| LLM 属性问答 | 可选悬浮卡片，解释属性面板内当前字段 | 与 UX 设计对齐，不挤占固定布局。 |
 | Text Symbolizer 预览 | 纳入 MVP；若 sample 数据有 `name` 字段则渲染 label，否则仅显示占位提示 | 常见组合（点 + 标注）需要预览支持。 |
 | Raster Symbolizer 预览 | 放到 Phase 2 | 需要栅格渲染与专用 Sample 数据，超出 MVP 范围。 |
 | 项目结构 | monorepo workspace，`frontend` 依赖 `core` package | 共享数据模型与转换逻辑，统一 parser 版本。 |
@@ -240,7 +246,7 @@ Frontend 直接导入 Core 包中的类：
 - [DF-005] 实现右键菜单与节点增删。
 - [DF-006] 实现同层级拖拽排序。
 - [DF-007] 加载 `SourceCode/data/registry/*.json` 作为静态资源。
-- [DF-008] 实现通用编辑器组件：String / Number / Color / Enum / Boolean / Textarea / Opacity / ScaleRange / Point2D / NumberArray / Font / Filter。
+- [DF-008] 实现通用编辑器组件：String / Number / Color / Enum / Boolean / Textarea / Opacity / ScaleRange / Point2D / NumberArray / Font / Filter / **LineStyle / PropertyName**。
 - [DF-009] 实现 JSON 驱动的 `PropertyForm`、`FormFieldRenderer` 与 `PropertyGroup` 分组折叠。
 - [DF-010] 实现 `MapPreview`：自动推导 + 手动切换 Sample 数据；Text 预览使用 `name` 字段。
 - [DF-011] 实现 `CodePanel`（JSON/XML/校验标签页）。

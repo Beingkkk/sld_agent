@@ -76,7 +76,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
 前端 `AppTitleBar.vue` 负责渲染自定义标题栏，要求：
 
-- 高度：`32px`。
+- 高度：`40px`。
 - 背景：`var(--bg-secondary)`。
 - 左侧：应用图标 + 标题 "SLDAgent" + 全局操作按钮（导入 / 导出）。
 - 右侧：最小化、最大化/还原、关闭按钮。
@@ -86,7 +86,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
 ```vue
 <!-- AppTitleBar.vue 伪代码 -->
-<div class="h-8 flex items-center justify-between bg-bg-secondary select-none" style="-webkit-app-region: drag;">
+<div class="h-10 flex items-center justify-between bg-bg-secondary select-none" style="-webkit-app-region: drag;">
   <div class="flex items-center gap-2 no-drag" style="-webkit-app-region: no-drag;">
     <AppIcon />
     <span>SLDAgent</span>

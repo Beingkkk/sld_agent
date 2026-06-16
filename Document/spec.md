@@ -23,12 +23,12 @@ SLDAgent MVP 是一个 Electron 桌面应用，允许用户通过可视化树形
 | 编号 | 需求 | 验收标准 |
 | :--- | :--- | :--- |
 | **M-01** | 三栏主界面 | 左侧树、中间属性/预览、右侧代码/校验稳定渲染，窗口最小 1200×800。 |
-| **M-02** | SLD 树编辑 | 支持 NamedLayer → UserStyle → FeatureTypeStyle → Rule → Symbolizer 五级树；**MVP 仅允许一个 NamedLayer**；Symbolizer kind 对齐 GeoStyler 原生类型（Mark / Line / Fill / Text）；支持增删改、折叠/展开、拖拽排序。 |
-| **M-03** | 节点属性面板 | 根据选中节点类型动态渲染分组表单项：UserStyle/FeatureTypeStyle/Rule/Symbolizer（Mark/Line/Fill/Text）；字段元数据来自外置 JSON registry。 |
-| **M-04** | 实时代码映射 | 树更新后同步刷新 GeoStyler JSON 与 SLD XML；代码区只读。 |
-| **M-05** | 实时地图预览 | 使用 OpenLayers + 内置 Sample GeoJSON（预转换自 `SourceCode/data/sample/` 下的 shapefile）渲染当前样式；支持按选中节点自动推导与手动切换点/线/面数据。 |
+| **M-02** | SLD 树编辑 | 支持 NamedLayer → UserStyle → FeatureTypeStyle → Rule → Symbolizer 五级树；**MVP 仅允许一个 NamedLayer 和一个 UserStyle**；Symbolizer kind 对齐 GeoStyler 原生类型（Mark / Line / Fill / Text）；支持增删改、折叠/展开、拖拽排序；树节点标签显示简化 XML 标签名（如 `NamedLayer`、`PointSymbolizer`），不带 `sld:` 前缀。 |
+| **M-03** | 节点属性面板 | 根据选中节点类型动态渲染分组表单项：UserStyle / FeatureTypeStyle / Rule / Symbolizer（Mark / Line / Fill / Text）；字段元数据来自外置 JSON registry；支持颜色选择器（含十六进制输入）、线型预设下拉框、标注字段下拉框、锚点 X/Y 数字输入等编辑器类型。 |
+| **M-04** | 实时代码映射 | 树更新后同步刷新 GeoStyler JSON 与 SLD XML；SLD XML 通过 `geostyler-sld-parser` 分片生成 + `fast-xml-parser` 后处理拼接；代码区只读。 |
+| **M-05** | 实时地图预览 | 使用 OpenLayers + 内置 Sample GeoJSON（预转换自 `SourceCode/data/sample/` 下的 shapefile）渲染当前样式；支持按选中节点自动推导与手动切换点/线/面数据：选中 Symbolizer 用其 kind，选中 Rule 用该 Rule 下第一个 Symbolizer 的 kind，选中更高级节点保留用户手动选择（默认面）。 |
 | **M-06** | 导入/导出 SLD | 支持打开已有 SLD XML 并解析为树；支持导出 SLD XML 到文件。 |
-| **M-07** | 基础校验 | 校验规则：Rule 下至少 1 个 Symbolizer；同一 FeatureTypeStyle 内只能有 1 个 ElseFilter；最小比例尺 < 最大比例尺。 |
+| **M-07** | 基础校验 | 校验规则：Rule 下至少 1 个 Symbolizer；同一 FeatureTypeStyle 内只能有 1 个 ElseFilter；最小比例尺 < 最大比例尺；校验结果实时展示，点击错误项可定位到对应树节点（MVP 定位到节点级，字段级定位放 Phase 2）。 |
 
 ### Should Have
 
@@ -36,7 +36,7 @@ SLDAgent MVP 是一个 Electron 桌面应用，允许用户通过可视化树形
 | :--- | :--- | :--- |
 | **S-01** | Filter 可视化构造器 | 支持以条件节点方式组合 CQL 条件，并实时生成 CQL 文本。 |
 | **S-02** | 比例尺滑块 | 在 Rule 面板提供最小/最大比例尺范围输入与同步提示。 |
-| **S-03** | 节点级 AI 解释 | 点击 Rule 旁 💡 按钮，后端 LLM 返回自然语言解释。 |
+| **S-03** | 节点级 AI 解释 | 点击 Rule 旁 💡 按钮，后端 LLM 返回自然语言解释与可选预警；**AI 不直接修改树，不提供“应用建议”按钮**。 |
 
 ### Won't Have（MVP 外）
 
@@ -58,13 +58,13 @@ SLDAgent MVP 是一个 Electron 桌面应用，允许用户通过可视化树形
 
 MVP 以 `geostyler-style` 为中间模型，Symbolizer kind 采用 GeoStyler 原生命名（`Mark` / `Line` / `Fill` / `Text`）。**MVP 的 SLD 树仅允许一个 NamedLayer 和一个 UserStyle**，后续再支持多 NamedLayer / 多 UserStyle。SLD 树与 GeoStyler Style 之间通过 Core 中的显式映射层转换，以兼容 SLD XML 语义字段与 GeoStyler 扁平字段之间的差异。
 
-同时扩展以下字段以保留 SLD 元数据：
+同时扩展以下字段以保留 SLD 元数据，这些字段存储在 SLD 树对象中：
 
 - `UserStyle.name`、`UserStyle.abstract`、`UserStyle.isDefault`
 - `FeatureTypeStyle.title`、`FeatureTypeStyle.abstract`、`FeatureTypeStyle.featureTypeName`
 - `Rule.elseFilter`、`Rule.abstract`
 
-扩展字段在 GeoStyler JSON 中保留，生成 SLD 时由自定义后处理写入。
+生成 SLD XML 时，由 `geostyler-sld-parser` 分片生成规则级片段，再通过 `fast-xml-parser` 后处理将上述元数据写入对应容器；导入时反向提取。
 
 ## 6. 关键术语
 
