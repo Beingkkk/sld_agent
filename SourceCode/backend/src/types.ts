@@ -1,3 +1,5 @@
+import type { KnowledgeBase } from './knowledge/types.js';
+
 export interface WsServerOptions {
   port: number | 0;
   knowledgeDir: string;
@@ -8,6 +10,8 @@ export interface WsServerOptions {
   wasmSchemaBundleDir?: string;
   staticSchemaDir?: string;
   useWasm?: boolean;
+  llmClient?: { complete(prompt: string): Promise<string> };
+  knowledgeBase?: KnowledgeBase;
 }
 
 export interface AppConfig {

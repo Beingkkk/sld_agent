@@ -7,7 +7,6 @@ import { KnowledgeBaseLoader } from './knowledge/KnowledgeBaseLoader.js';
 import { createSldService } from './sld/SldService.js';
 import { LlmClient } from './llm/LlmClient.js';
 import { loadConfig } from './config.js';
-
 import { PromptBuilder } from './knowledge/PromptBuilder.js';
 
 export function createServer(options: WsServerOptions) {
@@ -24,18 +23,21 @@ export function createServer(options: WsServerOptions) {
     wasmSchemaBundleDir: options.wasmSchemaBundleDir ?? options.staticSchemaDir,
     useWasm: options.useWasm,
   });
-  const config = loadConfig(options.configPath);
-  const llmClient = new LlmClient({
-    baseUrl: config.llm.base_url,
-    apiKey: config.llm.auth_key,
-    model: config.llm.model_name,
-  });
+
+  const llmClient = options.llmClient ?? (() => {
+    const config = loadConfig(options.configPath);
+    return new LlmClient({
+      baseUrl: config.llm.base_url,
+      apiKey: config.llm.auth_key,
+      model: config.llm.model_name,
+    });
+  })();
 
   const router = createRouter();
 
   async function ensureSession(ws: WebSocket): Promise<AgentSession> {
     if (!sessions.has(ws)) {
-      const knowledgeBase = await loader.load(options.knowledgeDir, 'default');
+      const knowledgeBase = options.knowledgeBase ?? await loader.load(options.knowledgeDir, 'default');
       const session = new AgentSession({
         id: randomUUID(),
         knowledgeBase,
