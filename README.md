@@ -37,7 +37,7 @@ OGC XSD 校验 + Parser Roundtrip 校验
 │   └── UX/                         # 交互原型
 ├── SourceCode/
 │   └── config/
-│       └── config.json.template    # LLM 连接配置模板
+│       └── config.example.json     # LLM 连接配置模板
 └── README.md
 ```
 
@@ -48,10 +48,10 @@ OGC XSD 校验 + Parser Roundtrip 校验
 复制配置模板并填写真实密钥：
 
 ```bash
-cp SourceCode/config/config.json.template SourceCode/config/config.json
+cp SourceCode/config/config.example.json SourceCode/config/config.json
 ```
 
-编辑 `SourceCode/config/config.json` 中的 `apiKey` 与所选 `provider`。
+编辑 `SourceCode/config/config.json` 中的 `auth_key`、`base_url` 与 `model_name`。
 
 ### 2. 启动服务
 
