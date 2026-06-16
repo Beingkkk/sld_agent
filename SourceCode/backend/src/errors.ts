@@ -1,4 +1,4 @@
-import type { ErrorCode, SldAgentErrorDetails } from './shared/types.js';
+import type { ErrorCode, SldAgentErrorDetails } from '@sldagent/shared/types';
 
 export class SldAgentError extends Error {
   public readonly code: ErrorCode;

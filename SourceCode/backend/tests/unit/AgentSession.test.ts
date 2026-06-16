@@ -95,4 +95,88 @@ describe('AgentSession', () => {
     expect(result.params.geometry_type).toBe('point');
     expect(result.params.style_type).toBe('simple');
   });
+
+  describe('applyPatch', () => {
+    it('applies replace patch to params and rebuilds style', async () => {
+      const session = createSession(new FakeLlmClient());
+      await session.generate({ instruction: 'red point', geometryType: 'point' });
+
+      const result = await session.applyPatch({
+        patches: [{ op: 'replace', path: '/fill_color', value: '#0000FF' }],
+      });
+
+      expect(result.params.fill_color).toBe('#0000FF');
+      expect(result.validation.passed).toBe(true);
+    });
+
+    it('applies add patch to rules array', async () => {
+      const session = createSession(new FakeLlmClient());
+      await session.generate({ instruction: 'red point', geometryType: 'point' });
+
+      const result = await session.applyPatch({
+        patches: [
+          {
+            op: 'add',
+            path: '/rules/-',
+            value: { name: 'New rule', symbolizers: [{ kind: 'Mark', wellKnownName: 'square' }] },
+          },
+        ],
+      });
+
+      expect(result.params.rules).toHaveLength(1);
+      expect(result.params.rules?.[0].name).toBe('New rule');
+      expect(result.validation.passed).toBe(true);
+    });
+
+    it('applies remove patch to rules array', async () => {
+      const session = createSession(new FakeLlmClient());
+      await session.generate({ instruction: 'red point', geometryType: 'point' });
+      await session.applyPatch({
+        patches: [
+          {
+            op: 'add',
+            path: '/rules/-',
+            value: { name: 'First', symbolizers: [{ kind: 'Mark' }] },
+          },
+          {
+            op: 'add',
+            path: '/rules/-',
+            value: { name: 'Second', symbolizers: [{ kind: 'Mark' }] },
+          },
+        ],
+      });
+
+      const result = await session.applyPatch({
+        patches: [{ op: 'remove', path: '/rules/0' }],
+      });
+
+      expect(result.params.rules).toHaveLength(1);
+      expect(result.params.rules?.[0].name).toBe('Second');
+    });
+
+    it('rejects invalid patch path with schema validation error', async () => {
+      const session = createSession(new FakeLlmClient());
+      await session.generate({ instruction: 'red point', geometryType: 'point' });
+
+      await expect(
+        session.applyPatch({ patches: [{ op: 'replace', path: '/unknown_field', value: 'x' }] })
+      ).rejects.toMatchObject({ code: 'SCHEMA_VALIDATION_FAILED' });
+    });
+
+    it('rolls back params on validation failure', async () => {
+      const session = createSession(new FakeLlmClient());
+      await session.generate({ instruction: 'red point', geometryType: 'point' });
+      const beforeParams = session.getState().params;
+
+      try {
+        await session.applyPatch({
+          patches: [{ op: 'replace', path: '/geometry_type', value: 'invalid' }],
+        });
+      } catch {
+        // expected
+      }
+
+      expect(session.getState().params).toEqual(beforeParams);
+    });
+  });
 });

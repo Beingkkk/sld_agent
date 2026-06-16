@@ -27,12 +27,11 @@ Thumbs.db
 Document/Research/
 
 # Local configuration (may contain secrets)
-SourceCode/config/
+SourceCode/config/*
+!SourceCode/config/config.example.json
 
 # CodeGraph local data
-.codegraph/*.db
-.codegraph/*.db-shm
-.codegraph/*.db-wal
-.codegraph/cache/
-.codegraph/*.log
-.codegraph/.dirty
+.codegraph/
+
+# Spike directories are not version-controlled (see CLAUDE.md)
+spike/

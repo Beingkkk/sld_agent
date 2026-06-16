@@ -3,7 +3,7 @@ import { WebSocket } from 'ws';
 import { createServer } from '../../src/server.js';
 import type { WsServerOptions } from '../../src/types.js';
 import type { KnowledgeBase } from '../../src/knowledge/types.js';
-import type { StyleParams, StylePatch } from '../../src/shared/types.js';
+import type { StyleParams, StylePatch } from '@sldagent/shared/types';
 
 class FakeLlmClient {
   constructor(private responses: object[]) {}

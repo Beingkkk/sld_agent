@@ -1,5 +1,5 @@
 import type { Style, Symbolizer, Rule } from 'geostyler-style';
-import type { ValidationResult } from '../shared/types.js';
+import type { ValidationResult } from '@sldagent/shared/types';
 import { SldParserWrapper } from './SldParserWrapper.js';
 
 /**

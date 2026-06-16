@@ -1,5 +1,5 @@
 import type { Style, Rule, Symbolizer, Filter } from 'geostyler-style';
-import type { DataSchema, StyleParams } from '../../shared/types.js';
+import type { DataSchema, PropertySchema, StyleParams } from '@sldagent/shared/types';
 import { BuilderError } from '../../errors.js';
 import type { KnowledgeBase } from '../../knowledge/types.js';
 
@@ -41,19 +41,22 @@ export class RuleGenerator {
     const prop = dataSchema?.properties.find((p) => p.name === field);
     const min = prop?.min ?? 0;
     const max = prop?.max ?? classes * 100;
+    const samples = extractNumericSamples(prop);
 
-    switch (method) {
-      case 'equalInterval':
-        return equalIntervalBreaks(min, max, classes);
-      case 'quantile':
-        // Without raw values, fall back to equal interval but mark as approximate.
-        return equalIntervalBreaks(min, max, classes);
-      case 'naturalBreaks':
-        // MVP fallback; true natural breaks require sample values.
-        return equalIntervalBreaks(min, max, classes);
-      default:
-        return equalIntervalBreaks(min, max, classes);
+    if (samples && samples.length >= classes) {
+      switch (method) {
+        case 'equalInterval':
+          return equalIntervalBreaks(min, max, classes);
+        case 'quantile':
+          return quantileBreaks(samples, classes) ?? equalIntervalBreaks(min, max, classes);
+        case 'naturalBreaks':
+          return naturalBreaks(samples, classes) ?? equalIntervalBreaks(min, max, classes);
+        default:
+          return equalIntervalBreaks(min, max, classes);
+      }
     }
+
+    return equalIntervalBreaks(min, max, classes);
   }
 }
 
@@ -64,6 +67,113 @@ function equalIntervalBreaks(min: number, max: number, classes: number): number[
   }
   breaks.push(max);
   return breaks;
+}
+
+function extractNumericSamples(prop?: PropertySchema): number[] | undefined {
+  if (!prop?.samples || prop.samples.length === 0) {
+    return undefined;
+  }
+  const numeric = prop.samples.filter((v): v is number => typeof v === 'number' && !Number.isNaN(v));
+  return numeric.length >= 2 ? numeric : undefined;
+}
+
+function quantileBreaks(values: number[], classes: number): number[] | undefined {
+  const sorted = [...values].sort((a, b) => a - b);
+  const n = sorted.length;
+  const breaks: number[] = [sorted[0]];
+  for (let i = 1; i < classes; i++) {
+    const idx = Math.floor((n * i) / classes);
+    breaks.push(sorted[idx]);
+  }
+  breaks.push(sorted[n - 1]);
+  return makeStrictlyIncreasing(sorted, breaks);
+}
+
+function naturalBreaks(values: number[], classes: number): number[] | undefined {
+  if (classes < 1 || classes >= values.length) {
+    return undefined;
+  }
+  const sorted = [...values].sort((a, b) => a - b);
+  const matrices = jenksMatrices(sorted, classes);
+  const breaks = jenksBreaks(sorted, matrices.lowerClassLimits, classes);
+  return makeStrictlyIncreasing(sorted, breaks);
+}
+
+function jenksMatrices(data: number[], nClasses: number): { lowerClassLimits: number[][]; varianceCombinations: number[][] } {
+  const lowerClassLimits: number[][] = [];
+  const varianceCombinations: number[][] = [];
+  for (let i = 0; i < data.length + 1; i++) {
+    lowerClassLimits.push(new Array(nClasses + 1).fill(0));
+    varianceCombinations.push(new Array(nClasses + 1).fill(0));
+  }
+
+  for (let i = 1; i < nClasses + 1; i++) {
+    lowerClassLimits[1][i] = 1;
+    varianceCombinations[1][i] = 0;
+    for (let j = 2; j < data.length + 1; j++) {
+      varianceCombinations[j][i] = Number.POSITIVE_INFINITY;
+    }
+  }
+
+  for (let l = 2; l < data.length + 1; l++) {
+    let sum = 0;
+    let sumSquares = 0;
+    let w = 0;
+    for (let m = 1; m < l + 1; m++) {
+      const lowerClassLimit = l - m + 1;
+      const val = data[lowerClassLimit - 1];
+      w++;
+      sum += val;
+      sumSquares += val * val;
+      const variance = sumSquares - (sum * sum) / w;
+      const i4 = lowerClassLimit - 1;
+      if (i4 !== 0) {
+        for (let j = 2; j < nClasses + 1; j++) {
+          if (varianceCombinations[l][j] >= variance + varianceCombinations[i4][j - 1]) {
+            lowerClassLimits[l][j] = lowerClassLimit;
+            varianceCombinations[l][j] = variance + varianceCombinations[i4][j - 1];
+          }
+        }
+      }
+    }
+    lowerClassLimits[l][1] = 1;
+    varianceCombinations[l][1] = sumSquares - (sum * sum) / w;
+  }
+
+  return { lowerClassLimits, varianceCombinations };
+}
+
+function jenksBreaks(data: number[], lowerClassLimits: number[][], nClasses: number): number[] {
+  const breaks: number[] = [];
+  let k = data.length;
+  let countNum = nClasses;
+
+  breaks[nClasses] = data[data.length - 1];
+
+  while (countNum > 0) {
+    breaks[countNum - 1] = data[lowerClassLimits[k][countNum] - 1];
+    k = lowerClassLimits[k][countNum] - 1;
+    countNum--;
+  }
+
+  return breaks;
+}
+
+function makeStrictlyIncreasing(sorted: number[], breaks: number[]): number[] | undefined {
+  const result: number[] = [breaks[0]];
+  for (let i = 1; i < breaks.length; i++) {
+    const prev = result[result.length - 1];
+    if (breaks[i] > prev) {
+      result.push(breaks[i]);
+    } else {
+      const next = sorted.find((v) => v > prev);
+      if (next === undefined) {
+        return undefined;
+      }
+      result.push(next);
+    }
+  }
+  return result;
 }
 
 export abstract class StyleBuilder {

@@ -1,4 +1,4 @@
-import type { StyleParams } from '../../shared/types.js';
+import type { StyleParams } from '@sldagent/shared/types';
 
 const ALIAS_MAP: Record<string, keyof StyleParams> = {
   font_color: 'stroke_color',

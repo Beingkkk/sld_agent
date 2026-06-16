@@ -8,6 +8,60 @@ export interface FileService {
 const RECENT_KEY = 'sld-agent:recent-files';
 
 export function createFileService(): FileService {
+  if (typeof window !== 'undefined' && window.electronAPI) {
+    return createElectronFileService();
+  }
+  return createBrowserFileService();
+}
+
+function createElectronFileService(): FileService {
+  const api = window.electronAPI!;
+
+  return {
+    async openGeoJson() {
+      const result = await api.openAndRead({
+        title: 'Open GeoJSON',
+        filters: [{ name: 'GeoJSON', extensions: ['geojson', 'json'] }],
+      });
+      if (!result) {
+        return undefined;
+      }
+      addRecentFile(result.path);
+      return result;
+    },
+    async openSld() {
+      const result = await api.openAndRead({
+        title: 'Open SLD',
+        filters: [{ name: 'SLD', extensions: ['sld', 'xml'] }],
+      });
+      if (!result) {
+        return undefined;
+      }
+      addRecentFile(result.path);
+      return result;
+    },
+    async saveSld(defaultName, xml) {
+      const path = await api.saveAndWrite(
+        {
+          title: 'Save SLD',
+          defaultPath: defaultName,
+          filters: [{ name: 'SLD', extensions: ['sld', 'xml'] }],
+        },
+        xml,
+      );
+      if (!path) {
+        return undefined;
+      }
+      addRecentFile(path);
+      return path;
+    },
+    getRecentFiles() {
+      return loadRecentFiles();
+    },
+  };
+}
+
+function createBrowserFileService(): FileService {
   return {
     async openGeoJson() {
       return openTextFile('.geojson,.json');
@@ -27,11 +81,7 @@ export function createFileService(): FileService {
       return defaultName;
     },
     getRecentFiles() {
-      try {
-        return JSON.parse(localStorage.getItem(RECENT_KEY) || '[]') as string[];
-      } catch {
-        return [];
-      }
+      return loadRecentFiles();
     },
   };
 }
@@ -56,9 +106,17 @@ function openTextFile(accept: string): Promise<{ path: string; content: string }
   });
 }
 
+function loadRecentFiles(): string[] {
+  try {
+    return JSON.parse(localStorage.getItem(RECENT_KEY) || '[]') as string[];
+  } catch {
+    return [];
+  }
+}
+
 function addRecentFile(path: string): void {
   try {
-    const existing = JSON.parse(localStorage.getItem(RECENT_KEY) || '[]') as string[];
+    const existing = loadRecentFiles();
     const updated = [path, ...existing.filter((p) => p !== path)].slice(0, 10);
     localStorage.setItem(RECENT_KEY, JSON.stringify(updated));
   } catch {

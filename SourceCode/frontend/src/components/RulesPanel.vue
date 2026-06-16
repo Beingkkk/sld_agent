@@ -1,8 +1,8 @@
 <template>
   <div class="rules-panel">
-    <div v-if="!store.currentStyle" class="empty">暂无规则</div>
+    <div v-if="!rules.length" class="empty">暂无规则</div>
     <div
-      v-for="(rule, idx) in store.currentStyle?.rules"
+      v-for="(rule, idx) in rules"
       :key="idx"
       class="rule-item"
     >
@@ -14,15 +14,17 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
 import { useStyleStore } from '../stores/styleStore';
+import type { RuleParams } from '@shared/types';
 
 const store = useStyleStore();
 
+const rules = computed(() => store.params?.rules ?? []);
+
 function addRule() {
-  const style = store.currentStyle;
-  if (!style) return;
-  const newRule = { name: `New rule ${style.rules.length + 1}`, symbolizers: [] };
-  store.applyPatch([{ op: 'add', path: `/rules/${style.rules.length}`, value: newRule }]);
+  const newRule: RuleParams = { name: `New rule ${rules.value.length + 1}`, symbolizers: [] };
+  store.applyPatch([{ op: 'add', path: '/rules/-', value: newRule }]);
 }
 
 function removeRule(idx: number) {
@@ -36,7 +38,6 @@ function removeRule(idx: number) {
   flex-direction: column;
   gap: 8px;
 }
-
 .rule-item {
   display: flex;
   justify-content: space-between;
@@ -45,7 +46,6 @@ function removeRule(idx: number) {
   background: #252538;
   border-radius: 4px;
 }
-
 .add-btn {
   background: #2a4a6a;
   border: none;

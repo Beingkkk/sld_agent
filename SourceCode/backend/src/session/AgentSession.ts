@@ -13,13 +13,14 @@ import type {
   Style as SharedStyle,
   StyleParams,
   ValidationReport,
-} from '../shared/types.js';
+} from '@sldagent/shared/types';
 import { SldAgentError } from '../errors.js';
 import type { IAgentSession, AgentSessionOptions, SessionState } from './types.js';
 import { PromptBuilder } from '../knowledge/PromptBuilder.js';
 import { StyleParamsValidator } from '../style/validation/StyleParamsValidator.js';
 import { ParamsNormalizer } from '../style/normalization/ParamsNormalizer.js';
 import { StyleBuilderFactory, DefaultValueResolver, RuleGenerator } from '../style/builder/StyleBuilder.js';
+import { applyPatches } from '@sldagent/shared/patch';
 import type { KnowledgeBase } from '../knowledge/types.js';
 
 interface SldServiceLike {
@@ -45,6 +46,7 @@ export class AgentSession implements IAgentSession {
   private currentStyle?: Style;
   private lastValidStyle?: Style;
   private lastValidSldXml?: string;
+  private lastValidParams?: StyleParams;
   private params?: StyleParams;
   private chatHistory: ChatMessage[] = [];
   private busy = false;
@@ -117,7 +119,7 @@ export class AgentSession implements IAgentSession {
         throw new SldAgentError('INVALID_REQUEST', 'No existing style to patch');
       }
 
-      const patched = applyPatches(this.params, request.patches);
+      const patched = applyPatches(this.params as unknown as Record<string, unknown>, request.patches) as unknown as StyleParams;
       const validation = this.validator.validateParams(patched);
       if (!validation.valid) {
         throw new SldAgentError('SCHEMA_VALIDATION_FAILED', 'Patched params failed schema validation', {
@@ -141,6 +143,7 @@ export class AgentSession implements IAgentSession {
       // TODO: implement full Style -> StyleParams reverse mapping.
       // For MVP, derive a minimal params snapshot so the session remains usable.
       this.params = deriveMinimalParams(style, this.params);
+      this.lastValidParams = structuredClone(this.params) as unknown as StyleParams;
       return {
         style: request.style,
         sldXml,
@@ -243,6 +246,7 @@ export class AgentSession implements IAgentSession {
     this.currentStyle = structuredClone(style) as unknown as Style;
     this.lastValidStyle = structuredClone(style) as unknown as Style;
     this.lastValidSldXml = sldXml;
+    this.lastValidParams = structuredClone(params) as unknown as StyleParams;
     this.params = structuredClone(params) as unknown as StyleParams;
 
     return {
@@ -274,6 +278,10 @@ export class AgentSession implements IAgentSession {
       this.currentStyle = structuredClone(this.lastValidStyle) as unknown as Style;
     } else {
       this.currentStyle = undefined;
+    }
+    if (this.lastValidParams) {
+      this.params = structuredClone(this.lastValidParams) as unknown as StyleParams;
+    } else {
       this.params = undefined;
     }
   }
@@ -306,29 +314,6 @@ function mergeParams(current: StyleParams, normalized: StyleParams, preserve: st
     }
   }
   return merged as unknown as StyleParams;
-}
-
-function applyPatches(params: StyleParams, patches: { op: string; path: string; value?: unknown }[]): StyleParams {
-  const result = structuredClone(params) as unknown as Record<string, unknown>;
-  for (const patch of patches) {
-    if (patch.op === 'replace') {
-      const path = patch.path.replace(/^\//, '').split('/');
-      setPath(result, path, patch.value);
-    }
-  }
-  return result as unknown as StyleParams;
-}
-
-function setPath(obj: Record<string, unknown>, path: string[], value: unknown): void {
-  let current: Record<string, unknown> = obj;
-  for (let i = 0; i < path.length - 1; i++) {
-    const key = path[i];
-    if (!(key in current)) {
-      current[key] = {};
-    }
-    current = current[key] as Record<string, unknown>;
-  }
-  current[path[path.length - 1]] = value;
 }
 
 function deriveMinimalParams(style: Style, existing?: StyleParams): StyleParams {

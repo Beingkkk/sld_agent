@@ -4,7 +4,7 @@ import type {
   WriteOptions,
   ValidationReport,
   ValidationResult,
-} from '../shared/types.js';
+} from '@sldagent/shared/types';
 import { RoundtripValidator } from './RoundtripValidator.js';
 import { SldParserWrapper } from './SldParserWrapper.js';
 import { ValidationReporter } from './ValidationReporter.js';

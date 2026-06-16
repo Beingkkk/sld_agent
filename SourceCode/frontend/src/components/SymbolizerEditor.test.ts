@@ -2,84 +2,76 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { nextTick } from 'vue';
 import SymbolizerEditor from './SymbolizerEditor.vue';
-import type { Style } from 'geostyler-style';
+import type { StyleParams } from '@shared/types';
 
 const mockApplyPatch = vi.fn().mockResolvedValue(undefined as never);
 
 vi.mock('../stores/styleStore', async () => {
   const { ref } = await import('vue');
-  const currentStyleRef = ref<Style | undefined>(undefined);
+  const paramsRef = ref<StyleParams | undefined>(undefined);
   return {
     useStyleStore: () => ({
-      get currentStyle() {
-        return currentStyleRef.value;
+      get params() {
+        return paramsRef.value;
       },
       applyPatch: mockApplyPatch,
     }),
-    __setCurrentStyle: (style: Style | undefined) => {
-      currentStyleRef.value = style;
+    __setParams: (params: StyleParams | undefined) => {
+      paramsRef.value = params;
     },
   };
 });
 
 // @ts-ignore - provided by mocked module
-import { __setCurrentStyle } from '../stores/styleStore';
+import { __setParams } from '../stores/styleStore';
 
-function createStyle(kind: 'Mark' | 'Line' | 'Fill' | 'Text', overrides: Record<string, unknown> = {}): Style {
-  const base: Record<string, Record<string, unknown>> = {
-    Mark: {
-      kind: 'Mark',
-      wellKnownName: 'circle',
+function createParams(geometryType: StyleParams['geometry_type'], overrides: Partial<StyleParams> = {}): StyleParams {
+  const base: Record<string, Partial<StyleParams>> = {
+    point: {
+      well_known_name: 'circle',
       size: 8,
-      color: '#FF0000',
-      strokeColor: '#000000',
-      strokeWidth: 1,
+      fill_color: '#FF0000',
+      stroke_color: '#000000',
+      stroke_width: 1,
     },
-    Line: {
-      kind: 'Line',
-      color: '#0000FF',
-      width: 2,
-      opacity: 1,
-      dasharray: [4, 4],
+    line: {
+      stroke_color: '#0000FF',
+      stroke_width: 2,
+      stroke_opacity: 1,
+      stroke_dasharray: '4 4',
     },
-    Fill: {
-      kind: 'Fill',
-      color: '#00FF00',
-      opacity: 0.5,
-      outlineColor: '#000000',
-      outlineWidth: 1,
+    polygon: {
+      fill_color: '#00FF00',
+      fill_opacity: 0.5,
+      stroke_color: '#000000',
+      stroke_width: 1,
     },
-    Text: {
-      kind: 'Text',
-      label: 'name',
-      size: 12,
-      color: '#000000',
-    },
+    raster: {},
   };
 
   return {
-    name: 'Test',
-    rules: [{
-      name: 'Default',
-      symbolizers: [{ ...base[kind], ...overrides }],
-    }],
-  } as unknown as Style;
+    style_name: 'Test',
+    geometry_type: geometryType,
+    style_type: geometryType === 'raster' ? 'raster' : 'simple',
+    ...base[geometryType],
+    ...overrides,
+  } as StyleParams;
 }
 
 describe('SymbolizerEditor', () => {
   beforeEach(() => {
-    __setCurrentStyle(undefined);
+    __setParams(undefined);
     mockApplyPatch.mockClear();
   });
 
-  it('shows empty state when currentStyle is undefined', () => {
+  it('shows empty state when params is undefined', () => {
     const wrapper = mount(SymbolizerEditor);
     expect(wrapper.find('.empty').exists()).toBe(true);
     expect(wrapper.text()).toContain('当前没有可编辑的符号化参数');
   });
 
-  it('renders Mark symbolizer fields', async () => {
-    __setCurrentStyle(createStyle('Mark'));
+  it('renders point fields from params', async () => {
+    __setParams(createParams('point'));
     const wrapper = mount(SymbolizerEditor);
     await nextTick();
 
@@ -91,8 +83,8 @@ describe('SymbolizerEditor', () => {
     expect(wrapper.text()).toContain('描边宽');
   });
 
-  it('renders Line symbolizer fields', async () => {
-    __setCurrentStyle(createStyle('Line'));
+  it('renders line fields from params', async () => {
+    __setParams(createParams('line'));
     const wrapper = mount(SymbolizerEditor);
     await nextTick();
 
@@ -102,8 +94,8 @@ describe('SymbolizerEditor', () => {
     expect(wrapper.text()).toContain('虚线');
   });
 
-  it('renders Fill symbolizer fields', async () => {
-    __setCurrentStyle(createStyle('Fill'));
+  it('renders polygon fields from params', async () => {
+    __setParams(createParams('polygon'));
     const wrapper = mount(SymbolizerEditor);
     await nextTick();
 
@@ -113,18 +105,8 @@ describe('SymbolizerEditor', () => {
     expect(wrapper.text()).toContain('描边宽');
   });
 
-  it('renders Text symbolizer fields', async () => {
-    __setCurrentStyle(createStyle('Text'));
-    const wrapper = mount(SymbolizerEditor);
-    await nextTick();
-
-    expect(wrapper.text()).toContain('标注字段');
-    expect(wrapper.text()).toContain('字号');
-    expect(wrapper.text()).toContain('颜色');
-  });
-
-  it('calls applyPatch when text field changes', async () => {
-    __setCurrentStyle(createStyle('Mark'));
+  it('calls applyPatch with StyleParams path when text field changes', async () => {
+    __setParams(createParams('point'));
     const wrapper = mount(SymbolizerEditor);
     await nextTick();
 
@@ -134,12 +116,13 @@ describe('SymbolizerEditor', () => {
     expect(mockApplyPatch).toHaveBeenCalledTimes(1);
     const patches = mockApplyPatch.mock.calls[0][0];
     expect(patches).toHaveLength(1);
-    expect(patches[0].path).toBe('/rules/0/symbolizers/0');
-    expect(patches[0].value).toMatchObject({ color: '#00FF00' });
+    expect(patches[0].op).toBe('replace');
+    expect(patches[0].path).toBe('/fill_color');
+    expect(patches[0].value).toBe('#00FF00');
   });
 
-  it('calls applyPatch when select field changes', async () => {
-    __setCurrentStyle(createStyle('Mark'));
+  it('calls applyPatch with StyleParams path when select field changes', async () => {
+    __setParams(createParams('point'));
     const wrapper = mount(SymbolizerEditor);
     await nextTick();
 
@@ -148,11 +131,12 @@ describe('SymbolizerEditor', () => {
 
     expect(mockApplyPatch).toHaveBeenCalledTimes(1);
     const patches = mockApplyPatch.mock.calls[0][0];
-    expect(patches[0].value).toMatchObject({ wellKnownName: 'square' });
+    expect(patches[0].path).toBe('/well_known_name');
+    expect(patches[0].value).toBe('square');
   });
 
-  it('calls applyPatch when number field changes', async () => {
-    __setCurrentStyle(createStyle('Mark'));
+  it('calls applyPatch with StyleParams path when number field changes', async () => {
+    __setParams(createParams('point'));
     const wrapper = mount(SymbolizerEditor);
     await nextTick();
 
@@ -161,6 +145,7 @@ describe('SymbolizerEditor', () => {
 
     expect(mockApplyPatch).toHaveBeenCalledTimes(1);
     const patches = mockApplyPatch.mock.calls[0][0];
-    expect(patches[0].value).toMatchObject({ size: 12 });
+    expect(patches[0].path).toBe('/size');
+    expect(patches[0].value).toBe(12);
   });
 });

@@ -4,16 +4,18 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx src/index.ts",
+    "build:shared": "cd ../shared && tsc",
+    "dev": "npm run build:shared && tsx src/index.ts",
     "start": "node dist/index.js",
-    "build": "tsc",
-    "test": "vitest run",
+    "build": "npm run build:shared && tsc",
+    "test": "npm run build:shared && vitest run",
     "test:watch": "vitest",
     "test:unit": "vitest run",
     "lint": "eslint src tests",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "npm run build:shared && tsc --noEmit"
   },
   "dependencies": {
+    "@sldagent/shared": "file:../shared",
     "@anthropic-ai/sdk": "^0.27.0",
     "ajv": "^8.17.1",
     "chroma-js": "^3.1.2",

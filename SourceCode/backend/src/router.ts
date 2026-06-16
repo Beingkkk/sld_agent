@@ -1,8 +1,8 @@
-import type { WsMessage, RequestPayloads, ResponsePayloads } from './shared/messages.js';
-import { isWsMessage } from './shared/messages.js';
+import type { WsMessage, RequestPayloads, ResponsePayloads } from '@sldagent/shared/messages';
+import { isWsMessage } from '@sldagent/shared/messages';
 import type { AgentSession } from './session/AgentSession.js';
 import { SldAgentError } from './errors.js';
-import type { ValidationError } from './shared/types.js';
+import type { ValidationError } from '@sldagent/shared/types';
 
 export function createRouter() {
   async function handle(raw: string, session: AgentSession): Promise<WsMessage> {

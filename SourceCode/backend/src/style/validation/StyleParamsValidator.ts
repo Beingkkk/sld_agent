@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Ajv from 'ajv';
-import type { StyleParams, ValidationError } from '../../shared/types.js';
+import type { StyleParams, ValidationError } from '@sldagent/shared/types';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const schema = JSON.parse(readFileSync(resolve(__dirname, './style-params.schema.json'), 'utf-8'));

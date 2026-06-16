@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { ref, computed } from 'vue';
+import { ref, computed, toRaw } from 'vue';
 import type {
   ChatMessage,
   DomainsResult,
@@ -9,6 +9,7 @@ import type {
   StylePatch,
   ValidationReport,
 } from '@shared/types';
+import { applyPatches } from '@shared/patch';
 import { createWsClient, type WsClient, type WsClientError } from '../services/wsClient';
 
 export const useStyleStore = defineStore('style', () => {
@@ -68,20 +69,27 @@ export const useStyleStore = defineStore('style', () => {
   }
 
   async function applyPatch(patches: StylePatch[]) {
-    const snapshot = currentStyle.value;
-    // Optimistic local update for direct Style patches.
-    applyPatchesLocally(patches);
+    const paramsSnapshot = params.value;
+    const styleSnapshot = currentStyle.value;
+    // Optimistic local update: apply patches to params immediately.
+    params.value = applyPatchesToParams(params.value, patches);
     busy.value = true;
     try {
       const result = (await wsClient.applyPatch({ patches: patches as unknown[] })) as GenerationResult;
       applyResult(result);
     } catch (err) {
       // Rollback optimistic update on failure.
-      currentStyle.value = snapshot;
+      params.value = paramsSnapshot;
+      currentStyle.value = styleSnapshot;
       throw err;
     } finally {
       busy.value = false;
     }
+  }
+
+  function applyPatchesToParams(target: StyleParams | undefined, patches: StylePatch[]): StyleParams | undefined {
+    if (!target) return undefined;
+    return applyPatches(toRaw(target) as unknown as Record<string, unknown>, patches) as unknown as StyleParams;
   }
 
   async function importStyle(style: Style) {
@@ -119,11 +127,6 @@ export const useStyleStore = defineStore('style', () => {
     explanation.value = result.explanation;
   }
 
-  function applyPatchesLocally(_patches: StylePatch[]) {
-    // TODO: implement local GeoStyler Style patch application for optimistic UI.
-    // For now, optimistic updates are deferred until the authoritative backend response arrives.
-  }
-
   return {
     currentStyle: computed(() => currentStyle.value),
     lastValidStyle: computed(() => lastValidStyle.value),
@@ -137,6 +140,7 @@ export const useStyleStore = defineStore('style', () => {
     generate,
     modify,
     applyPatch,
+    applyResult,
     importStyle,
     exportSld,
     validate,

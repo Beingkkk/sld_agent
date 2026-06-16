@@ -6,9 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
+    "build:electron": "tsc -p electron/tsconfig.json",
     "preview": "vite preview",
-    "electron:dev": "npm run build && electron .",
-    "electron:build": "npm run build && electron-builder",
+    "electron:dev": "npm run build && npm run build:electron && electron .",
+    "electron:build": "npm run build && npm run build:electron && electron-builder",
     "test": "vitest run",
     "test:unit": "vitest run",
     "lint": "eslint src electron",

@@ -9,15 +9,23 @@ const {
   mockAppIsPackaged,
   mockQuit,
   mockSpawn,
+  mockDialogShowOpen,
+  mockDialogShowSave,
+  mockIpcMainHandle,
+  mockIpcMainRemoveHandler,
 } = vi.hoisted(() => ({
   mockLoadURL: vi.fn(),
   mockBrowserWindow: vi.fn(() => ({
-    loadURL: vi.fn(),
+    loadURL: mockLoadURL,
   })),
   mockAppOn: vi.fn(),
   mockAppIsPackaged: vi.fn().mockReturnValue(false),
   mockQuit: vi.fn(),
   mockSpawn: vi.fn(),
+  mockDialogShowOpen: vi.fn(),
+  mockDialogShowSave: vi.fn(),
+  mockIpcMainHandle: vi.fn(),
+  mockIpcMainRemoveHandler: vi.fn(),
 }));
 
 vi.mock('electron', () => ({
@@ -28,6 +36,14 @@ vi.mock('electron', () => ({
     quit: mockQuit,
   },
   BrowserWindow: mockBrowserWindow,
+  dialog: {
+    showOpenDialog: mockDialogShowOpen,
+    showSaveDialog: mockDialogShowSave,
+  },
+  ipcMain: {
+    handle: mockIpcMainHandle,
+    removeHandler: mockIpcMainRemoveHandler,
+  },
 }));
 
 vi.mock('node:child_process', () => {
@@ -38,6 +54,16 @@ vi.mock('node:child_process', () => {
   };
 });
 
+vi.mock('node:fs/promises', () => {
+  const readFile = vi.fn();
+  const writeFile = vi.fn();
+  return {
+    readFile,
+    writeFile,
+    default: { readFile, writeFile },
+  };
+});
+
 process.env.SLD_ELECTRON_TEST = 'true';
 
 const {
@@ -45,7 +71,13 @@ const {
   startBackend,
   stopBackend,
   createWindow,
+  handleOpenAndRead,
+  handleSaveAndWrite,
+  registerIpcHandlers,
+  unregisterIpcHandlers,
 } = await import('./main');
+
+const { readFile, writeFile } = await import('node:fs/promises');
 
 function createMockChildProcess(): ChildProcess {
   const stdout = new EventEmitter();
@@ -116,15 +148,109 @@ describe('Electron main process', () => {
     expect(backend.kill).not.toHaveBeenCalled();
   });
 
-  it('creates development window with localhost URL', () => {
+  it('creates development window with localhost URL and preload', () => {
     createWindow(9876, false);
     expect(mockBrowserWindow).toHaveBeenCalledTimes(1);
+    expect(mockBrowserWindow).toHaveBeenCalledWith(
+      expect.objectContaining({
+        webPreferences: expect.objectContaining({
+          nodeIntegration: false,
+          contextIsolation: true,
+          preload: expect.stringMatching(/preload\.js$/),
+        }),
+      }),
+    );
     expect(mockBrowserWindow.mock.results[0].value.loadURL).toHaveBeenCalledWith('http://localhost:5173/?port=9876');
   });
 
-  it('creates packaged window with file URL', () => {
+  it('creates packaged window with file URL and preload', () => {
     const window = createWindow(9876, true);
     expect(window.loadURL).toHaveBeenCalledWith(expect.stringContaining('file://'));
     expect(window.loadURL).toHaveBeenCalledWith(expect.stringContaining('?port=9876'));
+  });
+});
+
+describe('IPC dialog handlers', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('handleOpenAndRead returns file content when user selects a file', async () => {
+    mockDialogShowOpen.mockResolvedValue({
+      canceled: false,
+      filePaths: ['/path/to/file.geojson'],
+    });
+    vi.mocked(readFile).mockResolvedValue('{"type":"FeatureCollection"}');
+
+    const result = await handleOpenAndRead({} as Electron.IpcMainInvokeEvent, {
+      title: 'Open',
+      filters: [{ name: 'GeoJSON', extensions: ['geojson'] }],
+    });
+
+    expect(mockDialogShowOpen).toHaveBeenCalledWith({
+      title: 'Open',
+      filters: [{ name: 'GeoJSON', extensions: ['geojson'] }],
+    });
+    expect(readFile).toHaveBeenCalledWith('/path/to/file.geojson', 'utf-8');
+    expect(result).toEqual({ path: '/path/to/file.geojson', content: '{"type":"FeatureCollection"}' });
+  });
+
+  it('handleOpenAndRead returns undefined when user cancels', async () => {
+    mockDialogShowOpen.mockResolvedValue({
+      canceled: true,
+      filePaths: [],
+    });
+
+    const result = await handleOpenAndRead({} as Electron.IpcMainInvokeEvent, {
+      title: 'Open',
+    });
+
+    expect(result).toBeUndefined();
+    expect(readFile).not.toHaveBeenCalled();
+  });
+
+  it('handleSaveAndWrite writes content and returns file path when user saves', async () => {
+    mockDialogShowSave.mockResolvedValue({
+      canceled: false,
+      filePath: '/path/to/style.sld',
+    });
+
+    const result = await handleSaveAndWrite(
+      {} as Electron.IpcMainInvokeEvent,
+      { title: 'Save', defaultPath: 'style.sld' },
+      '<sld/>',
+    );
+
+    expect(mockDialogShowSave).toHaveBeenCalledWith({ title: 'Save', defaultPath: 'style.sld' });
+    expect(writeFile).toHaveBeenCalledWith('/path/to/style.sld', '<sld/>', 'utf-8');
+    expect(result).toBe('/path/to/style.sld');
+  });
+
+  it('handleSaveAndWrite returns undefined when user cancels', async () => {
+    mockDialogShowSave.mockResolvedValue({
+      canceled: true,
+      filePath: undefined,
+    });
+
+    const result = await handleSaveAndWrite(
+      {} as Electron.IpcMainInvokeEvent,
+      { title: 'Save' },
+      '<sld/>',
+    );
+
+    expect(result).toBeUndefined();
+    expect(writeFile).not.toHaveBeenCalled();
+  });
+
+  it('registerIpcHandlers registers dialog channels', () => {
+    registerIpcHandlers();
+    expect(mockIpcMainHandle).toHaveBeenCalledWith('dialog:openAndRead', handleOpenAndRead);
+    expect(mockIpcMainHandle).toHaveBeenCalledWith('dialog:saveAndWrite', handleSaveAndWrite);
+  });
+
+  it('unregisterIpcHandlers removes dialog channels', () => {
+    unregisterIpcHandlers();
+    expect(mockIpcMainRemoveHandler).toHaveBeenCalledWith('dialog:openAndRead');
+    expect(mockIpcMainRemoveHandler).toHaveBeenCalledWith('dialog:saveAndWrite');
   });
 });

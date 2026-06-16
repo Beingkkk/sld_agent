@@ -35,8 +35,8 @@ OGC XSD 校验（xmllint / xmllint-wasm）+ Parser Roundtrip 校验
 MVP 代码骨架与核心模块已实现并提交到 `main`：
 
 - **SDD 文档**：`Document/constitution.md`、`spec.md`、5 个 `plan-{module}.md`、`design/` 已冻结或按 proposal 流程更新。
-- **后端**：`SourceCode/backend/` 已实现 WebSocket 服务、AgentSession、StyleBuilder、SldService、KnowledgeBaseLoader、PromptBuilder、LlmClient，单元测试 26 个 + e2e 流水线测试 9 个全部通过。
-- **前端**：`SourceCode/frontend/` 已实现 Vue 3 + Electron 骨架、Pinia Store、WebSocket 客户端、MapPreview、Inspector、Assistant、Toolbar、StatusBar 及组件（SymbolizerEditor、ValidationPanel、FilterEditor），单元/组件/Electron 主进程测试共 49 个全部通过。
+- **后端**：`SourceCode/backend/` 已实现 WebSocket 服务、AgentSession、StyleBuilder、SldService、KnowledgeBaseLoader、PromptBuilder、LlmClient，单元测试 + e2e 流水线测试共 **63** 个全部通过。
+- **前端**：`SourceCode/frontend/` 已实现 Vue 3 + Electron 骨架、Pinia Store、WebSocket 客户端、MapPreview、Inspector、Assistant、Toolbar、StatusBar 及组件（SymbolizerEditor、ValidationPanel、FilterEditor），单元/组件/Electron 主进程测试共 **67** 个全部通过。
 - **Spikes**：`spike/` 下已完成的 P0 结论已反向同步到设计文档；P1/P2 目录保留未跟踪，不进入版本控制。
 
 ## 高层架构
@@ -94,11 +94,11 @@ MVP 代码骨架与核心模块已实现并提交到 `main`：
 cd SourceCode/backend
 npm install
 npm run dev          # tsx 开发启动（输出 READY 行）
-npm run build        # 编译到 dist/
-npm run test         # vitest 全部测试（含 tests/e2e）
-npm run test:unit tests/unit/AgentSession.test.ts   # 单个测试文件
-npx vitest run tests/e2e/integration.test.ts        # 仅运行 e2e 流水线测试
-npm run typecheck    # tsc --noEmit
+npm run build        # 编译到 dist/（含共享包 build:shared）
+npm run test         # 先 build:shared，再运行 vitest 全部测试（含 tests/e2e）
+npx vitest run tests/unit/AgentSession.test.ts   # 单个测试文件
+npx vitest run tests/e2e/integration.test.ts     # 仅运行 e2e 流水线测试
+npm run typecheck    # build:shared + tsc --noEmit
 npm run lint         # eslint（当前缺少 ESLint 配置，会失败）
 ```
 
@@ -136,18 +136,19 @@ cd spike/openlayers-preview && npm install && npm test
 
 ## 共享代码与路径别名
 
-- **SourceCode/shared/**：前后端共享的类型定义、`WsMessage` 契约、`FilterNode` 适配器与 CQL 转换。
+- **SourceCode/shared/**：前后端共享的类型定义、`WsMessage` 契约、`FilterNode` 适配器、CQL 转换以及 `applyPatches` patch 工具。
   - 前端通过 `@shared` 别名引用（`vite.config.ts` 中配置为 `../shared`）。
-  - 后端当前在 `SourceCode/backend/src/shared/` 中维护独立副本，两者内容应保持同步；长期应将后端也迁移到 `SourceCode/shared/`。
+  - 后端通过 npm `file:../shared` 依赖以 `@sldagent/shared` 包形式引用，不再维护独立副本。
+  - 变更共享包后，后端 `npm run test` / `npm run typecheck` 会自动重新编译；前端 `vite` 开发模式直接读取源码，无需手动构建。
 - **前端内部**：`@/` 别名指向 `SourceCode/frontend/src/`。
 
 ## 已知设计债与实现注意
 
-1. **`apply_patch` 当前作用于 `StyleParams`**，而非 `GeoStyler Style`。`interface-contracts.md` 中的路径示例（如 `/rules/0/symbolizers/0/width`）描述的是对 Style 的修改，但当前实现把 patch 应用到 `StyleParams` 后再走 `StyleBuilder` 重建。这会导致部分 GeoStyler 特有字段无法通过 patch 直接编辑。需要在后续 proposal 中明确并统一语义。
+1. ~~`apply_patch` 目标语义不一致~~：已按 [`Document/changes/proposal-0005.md`](Document/changes/proposal-0005.md) 统一为 `StyleParams`，前后端与接口契约文档已对齐；新增 [`SourceCode/shared/patch.ts`](SourceCode/shared/patch.ts) 作为共享 patch 工具，支持 `replace` / `add` / `remove`。`SymbolizerEditor` 与 `RulesPanel` 已迁移到 `StyleParams` 路径。
 2. **`SldService` 的 XSD/Roundtrip 组件已拆分**：按 [`Document/changes/proposal-0003.md`](Document/changes/proposal-0003.md) 拆分为 `SldParserWrapper`、`XsdValidator`、`RoundtripValidator`、`ValidationReporter` 独立模块；`SldService` 现为薄门面。
-3. **`RuleGenerator` 近似实现**：`quantile` / `naturalBreaks` 目前退化为 `equalInterval`，因为 MVP 未接入原始要素采样值。
+3. ~~`RuleGenerator` 近似实现~~：已按 [`Document/changes/proposal-0004.md`](Document/changes/proposal-0004.md) 接入 `PropertySchema.samples`，`quantile` / `naturalBreaks` 现在基于真实采样值计算断点，采样不足时回退到 `equalInterval`。
 4. **前端组件测试已补齐**：FilterEditor、FilterNodeEditor、SymbolizerEditor、ValidationPanel、MapPreview 均已添加 `@vue/test-utils` 测试；Electron 主进程集成测试已覆盖 `main.ts` 中路径解析/启动/窗口创建逻辑。
-5. **`SourceCode/backend/src/shared/` 与 `SourceCode/shared/` 重复**：修改 Filter adapter、messages、types 时需要同时同步两份副本，直到后端迁移完成。
+5. ~~`SourceCode/backend/src/shared/` 与 `SourceCode/shared/` 重复~~：已迁移为 `@sldagent/shared` 包，重复副本已删除。
 
 ## Spike 已验证约束
 
@@ -202,10 +203,10 @@ cd spike/openlayers-preview && npm install && npm test
 ## 下一步
 
 1. ~~拆分 `SldService` 内部模块~~：已完成，见 [`Document/changes/proposal-0003.md`](Document/changes/proposal-0003.md)。
-2. **接入原始要素采样值**：让 `quantile` / `naturalBreaks` 真正按数据分布计算断点，而非退化为 `equalInterval`。
-3. **细化 `apply_patch` 本地乐观更新语义**，明确 patch 目标是 `StyleParams` 还是 `GeoStyler Style`。
-4. **统一共享代码目录**：将 `SourceCode/backend/src/shared/` 迁移到 `SourceCode/shared/`，消除重复副本。
-5. **完善 Electron 本地文件 IO**：在主进程增加 `dialog.showOpenDialog` / `showSaveDialog` 处理，并补充对应集成测试。
+2. ~~接入原始要素采样值~~：已完成，见 [`Document/changes/proposal-0004.md`](Document/changes/proposal-0004.md)。
+3. ~~细化 `apply_patch` 本地乐观更新语义~~：已完成，见 [`Document/changes/proposal-0005.md`](Document/changes/proposal-0005.md)。
+4. ~~统一共享代码目录~~：已完成，`SourceCode/backend/src/shared/` 已迁移到 `SourceCode/shared/` 作为 `@sldagent/shared` 包，重复副本已删除。
+5. ~~完善 Electron 本地文件 IO~~：已完成，主进程已增加 `dialog.showOpenDialog` / `showSaveDialog` IPC 处理（`dialog:openAndRead` / `dialog:saveAndWrite`），并补充了对应集成测试。
 
 ## 代码引用规范
 

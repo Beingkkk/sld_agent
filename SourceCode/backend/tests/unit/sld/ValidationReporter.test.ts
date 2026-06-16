@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { ValidationReporter } from '../../../src/sld/ValidationReporter.js';
-import type { ValidationResult } from '../../../src/shared/types.js';
+import type { ValidationResult } from '@sldagent/shared/types';
 
 describe('ValidationReporter', () => {
   const reporter = new ValidationReporter();

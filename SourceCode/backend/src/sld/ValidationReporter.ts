@@ -1,4 +1,4 @@
-import type { ValidationError, ValidationReport, ValidationResult } from '../shared/types.js';
+import type { ValidationError, ValidationReport, ValidationResult } from '@sldagent/shared/types';
 
 /**
  * 将多个独立校验结果聚合成统一的 ValidationReport。

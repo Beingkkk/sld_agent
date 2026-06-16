@@ -4,6 +4,6 @@ export type {
   ValidationReport,
   ValidationResult,
   ValidationError,
-} from '../shared/types.js';
+} from '@sldagent/shared/types';
 
 export type { ISldService } from './SldService.js';

@@ -1,6 +1,6 @@
 import SldParser from 'geostyler-sld-parser';
 import type { Style } from 'geostyler-style';
-import type { WriteOptions } from '../shared/types.js';
+import type { WriteOptions } from '@sldagent/shared/types';
 
 /**
  * 封装 geostyler-sld-parser 的 SLD 写出与读入。

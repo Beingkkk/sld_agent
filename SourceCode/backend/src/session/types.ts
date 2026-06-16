@@ -12,7 +12,7 @@ import type {
   Style,
   StyleParams,
   ValidationReport,
-} from '../shared/types.js';
+} from '@sldagent/shared/types';
 import type { PromptBuilder } from '../knowledge/PromptBuilder.js';
 
 export interface SessionState {

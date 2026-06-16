@@ -1,7 +1,7 @@
 import { statSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { SldServiceOptions, ValidationResult } from '../shared/types.js';
+import type { SldServiceOptions, ValidationResult } from '@sldagent/shared/types';
 
 /**
  * OGC SLD 1.0.0 XSD 校验器。

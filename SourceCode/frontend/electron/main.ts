@@ -1,5 +1,6 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 import { spawn, type ChildProcess } from 'node:child_process';
+import { readFile, writeFile } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -53,6 +54,7 @@ export function createWindow(port: number, isPackaged: boolean): BrowserWindow {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      preload: resolve(__dirname, 'preload.js'),
     },
   });
 
@@ -64,12 +66,49 @@ export function createWindow(port: number, isPackaged: boolean): BrowserWindow {
   return window;
 }
 
+export async function handleOpenAndRead(
+  _event: Electron.IpcMainInvokeEvent,
+  options: Electron.OpenDialogOptions,
+): Promise<{ path: string; content: string } | undefined> {
+  const result = await dialog.showOpenDialog(options);
+  if (result.canceled || result.filePaths.length === 0) {
+    return undefined;
+  }
+  const path = result.filePaths[0];
+  const content = await readFile(path, 'utf-8');
+  return { path, content };
+}
+
+export async function handleSaveAndWrite(
+  _event: Electron.IpcMainInvokeEvent,
+  options: Electron.SaveDialogOptions,
+  content: string,
+): Promise<string | undefined> {
+  const result = await dialog.showSaveDialog(options);
+  if (result.canceled || !result.filePath) {
+    return undefined;
+  }
+  await writeFile(result.filePath, content, 'utf-8');
+  return result.filePath;
+}
+
+export function registerIpcHandlers(): void {
+  ipcMain.handle('dialog:openAndRead', handleOpenAndRead);
+  ipcMain.handle('dialog:saveAndWrite', handleSaveAndWrite);
+}
+
+export function unregisterIpcHandlers(): void {
+  ipcMain.removeHandler('dialog:openAndRead');
+  ipcMain.removeHandler('dialog:saveAndWrite');
+}
+
 // Production entry point. Tests set SLD_ELECTRON_TEST=true to skip this block.
 if (process.env.SLD_ELECTRON_TEST !== 'true') {
   let backendProcess: ChildProcess | null = null;
   let mainWindow: BrowserWindow | null = null;
 
   app.whenReady().then(async () => {
+    registerIpcHandlers();
     const result = await startBackend(resolveBackendPath(app.isPackaged));
     backendProcess = result.process;
     mainWindow = createWindow(result.port, app.isPackaged);

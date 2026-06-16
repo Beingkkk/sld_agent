@@ -2,6 +2,7 @@ import type {
   ApplyPatchRequest,
   DataSchema,
   DomainsResult,
+  ErrorCode,
   ExportRequest,
   ExportResult,
   GenerateRequest,
@@ -9,6 +10,7 @@ import type {
   ImportStyleRequest,
   ModifyRequest,
   Style,
+  ValidationError,
   ValidationReport,
 } from './types.js';
 
@@ -21,11 +23,15 @@ export interface WsMessage {
 
 export interface ErrorPayload {
   requestId: string;
-  code: string;
+  code: ErrorCode;
   message: string;
-  details?: unknown;
+  details?: ValidationError[];
   style?: Style;
   busy?: boolean;
+}
+
+export interface OkPayload {
+  ok: true;
 }
 
 export type RequestPayloads = {
@@ -46,6 +52,7 @@ export type ResponsePayloads = {
   export_result: ExportResult;
   validation_result: { style: Style; validation: ValidationReport };
   domains_result: DomainsResult;
+  ok: OkPayload;
   error: ErrorPayload;
   pong: { timestamp: number };
 };

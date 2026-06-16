@@ -148,9 +148,11 @@ interface ModifyRequest {
 
 ```typescript
 interface ApplyPatchRequest {
-  /** RFC 6902 JSON Patch 子集，描述对当前 Style 的修改。
+  /** RFC 6902 JSON Patch 子集，描述对当前 `StyleParams` 的修改。
+   *  路径为 JSON Pointer，目标字段是 `StyleParams` 而非 GeoStyler Style，例如：
+   *    /fill_color、/rules/0/name、/categories/-/label
    *  支持多条 patch 原子性应用，MVP 采用“确认后提交”模式：
-   *  用户在前端参数面板/分类表格/Filter 编辑器中完成一组修改后，
+   *  用户在前端参数面板/规则列表/分类表格中完成一组修改后，
    *  点击“应用”才统一发送。 */
   patches: StylePatch[];
 }
@@ -158,7 +160,7 @@ interface ApplyPatchRequest {
 /** 简化版 Patch：只支持 replace / add / remove 单条路径 */
 interface StylePatch {
   op: 'replace' | 'add' | 'remove';
-  /** JSON Pointer，例如 /rules/0/symbolizers/0/width */
+  /** JSON Pointer，指向 `StyleParams` 字段，例如 /fill_color、/rules/0/filter、/categories/- */
   path: string;
   value?: unknown;
 }
@@ -167,9 +169,11 @@ interface StylePatch {
 **响应**：同 `generation_result`。
 
 **关键约定**：
-- `apply_patch` 是**参数化精修**的主路径：用户通过前端表单、分类表格、Filter 树等结构化 UI 直接修改样式参数，不经过 LLM 语义解析。
-- 前端可以本地乐观更新，但必须在后端返回成功后才能真正替换 `StyleStore`。
-- 后端按数组顺序应用所有 patch，再统一执行 `writeStyle + 校验`；任一环节失败则整批回退到 `lastValidStyle`，前端撤销乐观更新。
+- `apply_patch` 的 `patches` 目标对象是 **`StyleParams`**，而非 `GeoStyler Style`。
+- 后端将 patches 应用到 `AgentSession.params`，经 `StyleParamsValidator` 校验、`ParamsNormalizer` 归一化后，由 `StyleBuilder` 重建 `GeoStyler Style`。
+- 路径示例：`/fill_color`（修改填充色）、`/rules/0/name`（修改规则名）、`/categories/-`（追加分类）、`/rules/0/filter`（替换过滤器）。
+- 前端可以本地乐观更新 `params`，但 `currentStyle` 仍由后端返回的 `GenerationResult` 权威更新；后端失败时前端需撤销对 `params` 的乐观修改。
+- 后端按数组顺序应用所有 patch，再统一执行 `writeStyle + 校验`；任一环节失败则整批回退到 `lastValidStyle` 与 `lastValidParams`。
 - MVP 不采用“即时提交”（每改一个字段就发一次 WS），以降低校验频率并保证状态一致性。
 
 ---
