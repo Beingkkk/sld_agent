@@ -35,8 +35,8 @@ OGC XSD 校验（xmllint / xmllint-wasm）+ Parser Roundtrip 校验
 MVP 代码骨架与核心模块已实现并提交到 `main`：
 
 - **SDD 文档**：`Document/constitution.md`、`spec.md`、5 个 `plan-{module}.md`、`design/` 已冻结或按 proposal 流程更新。
-- **后端**：`SourceCode/backend/` 已实现 WebSocket 服务、AgentSession、StyleBuilder、SldService、KnowledgeBaseLoader、PromptBuilder、LlmClient，单元测试 21 个全部通过。
-- **前端**：`SourceCode/frontend/` 已实现 Vue 3 + Electron 骨架、Pinia Store、WebSocket 客户端、MapPreview、Inspector、Assistant、Toolbar、StatusBar 及新增组件（SymbolizerEditor、ValidationPanel、FilterEditor），单元测试 8 个全部通过。
+- **后端**：`SourceCode/backend/` 已实现 WebSocket 服务、AgentSession、StyleBuilder、SldService、KnowledgeBaseLoader、PromptBuilder、LlmClient，单元测试 26 个 + e2e 流水线测试 9 个全部通过。
+- **前端**：`SourceCode/frontend/` 已实现 Vue 3 + Electron 骨架、Pinia Store、WebSocket 客户端、MapPreview、Inspector、Assistant、Toolbar、StatusBar 及组件（SymbolizerEditor、ValidationPanel、FilterEditor），单元/组件/Electron 主进程测试共 49 个全部通过。
 - **Spikes**：`spike/` 下已完成的 P0 结论已反向同步到设计文档；P1/P2 目录保留未跟踪，不进入版本控制。
 
 ## 高层架构
@@ -95,10 +95,11 @@ cd SourceCode/backend
 npm install
 npm run dev          # tsx 开发启动（输出 READY 行）
 npm run build        # 编译到 dist/
-npm run test         # vitest 全部测试
+npm run test         # vitest 全部测试（含 tests/e2e）
 npm run test:unit tests/unit/AgentSession.test.ts   # 单个测试文件
+npx vitest run tests/e2e/integration.test.ts        # 仅运行 e2e 流水线测试
 npm run typecheck    # tsc --noEmit
-npm run lint         # eslint
+npm run lint         # eslint（当前缺少 ESLint 配置，会失败）
 ```
 
 ### 前端
@@ -108,8 +109,11 @@ cd SourceCode/frontend
 npm install
 npm run dev          # Vite 开发服务器
 npm run build        # vue-tsc + vite build
-npm run test         # vitest（包含 tests/unit 与 src/**/*.test.ts）
+npm run test         # vitest（含 tests/unit、src/**/*.test.ts、electron/**/*.test.ts）
+npx vitest run src/components/SymbolizerEditor.test.ts   # 单个组件测试
+npx vitest run electron/main.test.ts                     # Electron 主进程测试
 npm run typecheck    # vue-tsc --noEmit
+npm run lint         # eslint src electron（当前缺少 ESLint 配置，会失败）
 npm run electron:dev # Electron 开发模式
 npm run electron:build # Electron 打包
 ```
@@ -140,9 +144,9 @@ cd spike/openlayers-preview && npm install && npm test
 ## 已知设计债与实现注意
 
 1. **`apply_patch` 当前作用于 `StyleParams`**，而非 `GeoStyler Style`。`interface-contracts.md` 中的路径示例（如 `/rules/0/symbolizers/0/width`）描述的是对 Style 的修改，但当前实现把 patch 应用到 `StyleParams` 后再走 `StyleBuilder` 重建。这会导致部分 GeoStyler 特有字段无法通过 patch 直接编辑。需要在后续 proposal 中明确并统一语义。
-2. **`SldService` 的 XSD/Roundtrip 组件内联**：`XsdValidator`、`RoundtripValidator`、`XmlGeometryStripper`、`ValidationReporter` 目前都是 `SldService.ts` 中的私有函数，未按 `plan-sld-service.md` 拆分为独立模块。
+2. **`SldService` 的 XSD/Roundtrip 组件已拆分**：按 [`Document/changes/proposal-0003.md`](Document/changes/proposal-0003.md) 拆分为 `SldParserWrapper`、`XsdValidator`、`RoundtripValidator`、`ValidationReporter` 独立模块；`SldService` 现为薄门面。
 3. **`RuleGenerator` 近似实现**：`quantile` / `naturalBreaks` 目前退化为 `equalInterval`，因为 MVP 未接入原始要素采样值。
-4. **前端缺少组件级测试**：FilterEditor、SymbolizerEditor、ValidationPanel、MapPreview 等组件仅有功能实现，无 Vue Test Utils 测试。
+4. **前端组件测试已补齐**：FilterEditor、FilterNodeEditor、SymbolizerEditor、ValidationPanel、MapPreview 均已添加 `@vue/test-utils` 测试；Electron 主进程集成测试已覆盖 `main.ts` 中路径解析/启动/窗口创建逻辑。
 5. **`SourceCode/backend/src/shared/` 与 `SourceCode/shared/` 重复**：修改 Filter adapter、messages、types 时需要同时同步两份副本，直到后端迁移完成。
 
 ## Spike 已验证约束
@@ -197,11 +201,11 @@ cd spike/openlayers-preview && npm install && npm test
 
 ## 下一步
 
-1. **使用真实 `xmllint-wasm` schema bundle 验证生产级 XSD 校验**。
-2. **补充前端组件测试**（FilterEditor、SymbolizerEditor、ValidationPanel、MapPreview）。
-3. **完善 Electron 主进程集成测试与本地文件 IO**。
-4. **细化 `apply_patch` 本地乐观更新语义**，明确 patch 目标是 `StyleParams` 还是 `GeoStyler Style`。
-5. **统一共享代码目录**：将 `SourceCode/backend/src/shared/` 迁移到 `SourceCode/shared/`，消除重复副本。
+1. ~~拆分 `SldService` 内部模块~~：已完成，见 [`Document/changes/proposal-0003.md`](Document/changes/proposal-0003.md)。
+2. **接入原始要素采样值**：让 `quantile` / `naturalBreaks` 真正按数据分布计算断点，而非退化为 `equalInterval`。
+3. **细化 `apply_patch` 本地乐观更新语义**，明确 patch 目标是 `StyleParams` 还是 `GeoStyler Style`。
+4. **统一共享代码目录**：将 `SourceCode/backend/src/shared/` 迁移到 `SourceCode/shared/`，消除重复副本。
+5. **完善 Electron 本地文件 IO**：在主进程增加 `dialog.showOpenDialog` / `showSaveDialog` 处理，并补充对应集成测试。
 
 ## 代码引用规范
 
