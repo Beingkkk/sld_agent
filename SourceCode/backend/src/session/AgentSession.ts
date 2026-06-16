@@ -10,6 +10,8 @@ import type {
   GenerationResult,
   ImportStyleRequest,
   ModifyRequest,
+  SampleDatasetData,
+  SampleDatasetInfo,
   Style as SharedStyle,
   StyleParams,
   ValidationReport,
@@ -22,6 +24,7 @@ import { ParamsNormalizer } from '../style/normalization/ParamsNormalizer.js';
 import { StyleBuilderFactory, DefaultValueResolver, RuleGenerator } from '../style/builder/StyleBuilder.js';
 import { applyPatches } from '@sldagent/shared/patch';
 import type { KnowledgeBase } from '../knowledge/types.js';
+import { SampleDatasetService } from '../services/SampleDatasetService.js';
 
 interface SldServiceLike {
   writeStyle(style: Style): Promise<string>;
@@ -50,6 +53,7 @@ export class AgentSession implements IAgentSession {
   private params?: StyleParams;
   private chatHistory: ChatMessage[] = [];
   private busy = false;
+  private sampleDatasetService?: SampleDatasetService;
 
   constructor(options: AgentSessionOptions) {
     this.id = options.id;
@@ -58,6 +62,9 @@ export class AgentSession implements IAgentSession {
     this.sldService = options.sldService as SldServiceLike;
     this.llmClient = options.llmClient as LlmClientLike;
     this.resolver = new DefaultValueResolver(this.knowledgeBase);
+    if (options.dataDir) {
+      this.sampleDatasetService = new SampleDatasetService(options.dataDir);
+    }
   }
 
   async generate(request: GenerateRequest): Promise<GenerationResult> {
@@ -186,6 +193,25 @@ export class AgentSession implements IAgentSession {
 
   setDataSchema(schema: DataSchema): void {
     this.dataSchema = schema;
+  }
+
+  async listSampleDatasets(): Promise<{ datasets: SampleDatasetInfo[] }> {
+    if (!this.sampleDatasetService) {
+      return { datasets: [] };
+    }
+    return this.sampleDatasetService.listDatasets();
+  }
+
+  async getSampleDataset(id: string): Promise<SampleDatasetData> {
+    if (!this.sampleDatasetService) {
+      throw new SldAgentError('INVALID_REQUEST', 'Sample datasets are not configured');
+    }
+    try {
+      return await this.sampleDatasetService.loadDataset(id);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      throw new SldAgentError('INVALID_REQUEST', `Failed to load dataset ${id}: ${message}`);
+    }
   }
 
   getState(): SessionState {

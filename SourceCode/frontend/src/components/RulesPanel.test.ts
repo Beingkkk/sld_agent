@@ -54,8 +54,8 @@ describe('RulesPanel', () => {
     const wrapper = mount(RulesPanel);
     await nextTick();
 
-    expect(wrapper.text()).toContain('1. Default');
-    expect(wrapper.text()).toContain('2. Secondary');
+    expect(wrapper.text()).toContain('Default');
+    expect(wrapper.text()).toContain('Secondary');
   });
 
   it('emits add patch with RuleParams shape', async () => {

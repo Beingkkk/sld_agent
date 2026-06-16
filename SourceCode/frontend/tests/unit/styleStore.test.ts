@@ -13,6 +13,8 @@ vi.mock('../../src/services/wsClient', () => ({
     importStyle: (payload: unknown) => mockSend('import_style', payload),
     validate: () => mockSend('validate', {}),
     setDomain: (domain: string) => mockSend('set_domain', { domain }),
+    listSampleDatasets: () => mockSend('list_sample_datasets', {}),
+    getSampleDataset: (id: string) => mockSend('get_sample_dataset', { id }),
   }),
 }));
 
@@ -60,6 +62,113 @@ describe('StyleStore', () => {
     const store = useStyleStore();
     const xml = await store.exportSld();
     expect(xml).toBe('<xml/>');
+  });
+
+  it('loads sample datasets via wsClient', async () => {
+    const datasets = [{ id: 'sld_cookbook_point', geometryType: 'point' }];
+    mockSend.mockResolvedValue({ datasets });
+
+    const store = useStyleStore();
+    await store.loadSampleDatasets();
+
+    expect(mockSend).toHaveBeenCalledWith('list_sample_datasets', {});
+    expect(store.sampleDatasets).toEqual(datasets);
+  });
+
+  it('loads a sample dataset via wsClient', async () => {
+    mockSend.mockResolvedValue({ datasets: [] });
+    const store = useStyleStore();
+    await nextTickPromise();
+    mockSend.mockClear();
+
+    const dataset = {
+      id: 'sld_cookbook_line',
+      name: 'Line',
+      geometryType: 'line',
+      crs: 'EPSG:4326',
+      featureCount: 2,
+      geojson: { type: 'FeatureCollection', features: [] },
+      extent: [0, 0, 1, 1],
+    };
+    mockSend.mockResolvedValue(dataset);
+
+    await store.loadSampleDataset('sld_cookbook_line');
+
+    expect(mockSend).toHaveBeenCalledWith('get_sample_dataset', { id: 'sld_cookbook_line' });
+    expect(store.activeDataset).toEqual(dataset);
+  });
+
+  it('selects dataset for geometry_type', async () => {
+    const pointDataset = { id: 'sld_cookbook_point', geometryType: 'point' };
+    mockSend.mockResolvedValueOnce({ datasets: [pointDataset] });
+    const fullDataset = {
+      id: 'sld_cookbook_point',
+      name: 'Point',
+      geometryType: 'point',
+      crs: 'EPSG:4326',
+      featureCount: 1,
+      geojson: { type: 'FeatureCollection', features: [] },
+      extent: [0, 0, 1, 1],
+    };
+    mockSend.mockResolvedValueOnce(fullDataset);
+
+    const store = useStyleStore();
+    await store.loadSampleDatasets();
+    await store.selectDatasetForGeometry('point');
+
+    expect(mockSend).toHaveBeenLastCalledWith('get_sample_dataset', { id: 'sld_cookbook_point' });
+    expect(store.activeDataset).toEqual(fullDataset);
+  });
+
+  it('selects line dataset for linestring geometry_type alias', async () => {
+    const lineDataset = { id: 'sld_cookbook_line', geometryType: 'line' };
+    mockSend.mockResolvedValueOnce({ datasets: [lineDataset] });
+    const fullDataset = {
+      id: 'sld_cookbook_line',
+      name: 'Line',
+      geometryType: 'line',
+      crs: 'EPSG:4326',
+      featureCount: 1,
+      geojson: { type: 'FeatureCollection', features: [] },
+      extent: [0, 0, 1, 1],
+    };
+    mockSend.mockResolvedValueOnce(fullDataset);
+
+    const store = useStyleStore();
+    await store.loadSampleDatasets();
+    await store.selectDatasetForGeometry('linestring');
+
+    expect(mockSend).toHaveBeenLastCalledWith('get_sample_dataset', { id: 'sld_cookbook_line' });
+  });
+
+  it('selects dataset when applyResult sets geometry_type', async () => {
+    const pointDataset = { id: 'sld_cookbook_point', geometryType: 'point' };
+    const fullDataset = {
+      id: 'sld_cookbook_point',
+      name: 'Point',
+      geometryType: 'point',
+      crs: 'EPSG:4326',
+      featureCount: 1,
+      geojson: { type: 'FeatureCollection', features: [] },
+      extent: [0, 0, 1, 1],
+    };
+    mockSend.mockResolvedValueOnce({ datasets: [pointDataset] });
+    mockSend.mockResolvedValueOnce(fullDataset);
+
+    const store = useStyleStore();
+    await flushPromises();
+
+    store.applyResult({
+      style: { name: 's' },
+      sldXml: '<xml/>',
+      params: { style_name: 's', geometry_type: 'point', style_type: 'simple' },
+      validation: { passed: true, errors: [] },
+      explanation: 'ok',
+    });
+
+    await flushPromises();
+
+    expect(store.activeDataset).toEqual(fullDataset);
   });
 
   describe('applyPatch', () => {
@@ -153,3 +262,11 @@ describe('StyleStore', () => {
     });
   });
 });
+
+function nextTickPromise(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+function flushPromises(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 10));
+}

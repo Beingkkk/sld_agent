@@ -29,11 +29,11 @@ describe('ValidationPanel', () => {
 
   it('shows empty state when validation is undefined', () => {
     const wrapper = mount(ValidationPanel);
-    expect(wrapper.find('.empty').exists()).toBe(true);
+    expect(wrapper.find('.params-empty').exists()).toBe(true);
     expect(wrapper.text()).toContain('暂无校验结果');
   });
 
-  it('shows success summary when validation passed', async () => {
+  it('shows pass state when validation passed', async () => {
     __setValidation({
       passed: true,
       schema: { passed: true, tool: 'ajv' },
@@ -45,14 +45,15 @@ describe('ValidationPanel', () => {
     const wrapper = mount(ValidationPanel);
     await nextTick();
 
-    expect(wrapper.find('.summary.ok').exists()).toBe(true);
-    expect(wrapper.text()).toContain('✅ 校验通过');
+    const items = wrapper.findAll('.check-item');
+    expect(items.length).toBe(3);
+    expect(items.every((item) => item.classes().includes('pass'))).toBe(true);
     expect(wrapper.text()).toContain('JSON Schema');
     expect(wrapper.text()).toContain('XSD');
     expect(wrapper.text()).toContain('Roundtrip');
   });
 
-  it('shows failure summary and error list when validation failed', async () => {
+  it('shows failure state and error list when validation failed', async () => {
     __setValidation({
       passed: false,
       xsd: { passed: false, tool: 'xmllint-wasm', message: 'Invalid SLD' },
@@ -66,8 +67,8 @@ describe('ValidationPanel', () => {
     const wrapper = mount(ValidationPanel);
     await nextTick();
 
-    expect(wrapper.find('.summary.fail').exists()).toBe(true);
-    expect(wrapper.text()).toContain('❌ 校验未通过');
+    expect(wrapper.find('.check-item.fail').exists()).toBe(true);
+    expect(wrapper.text()).toContain('校验未通过');
     expect(wrapper.text()).toContain('[xsd] Invalid SLD');
     expect(wrapper.text()).toContain('[roundtrip]');
     expect(wrapper.text()).toContain('Mismatch');

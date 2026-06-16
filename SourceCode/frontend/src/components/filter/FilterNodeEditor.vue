@@ -1,12 +1,13 @@
 <template>
   <div class="filter-node-editor">
     <div v-if="node.type === 'comparison'" class="comparison">
-      <select :value="node.operator" @change="update('operator', ($event.target as HTMLSelectElement).value)">
+      <select class="form-select" :value="node.operator" @change="update('operator', ($event.target as HTMLSelectElement).value)">
         <option v-for="op in comparisonOps" :key="op" :value="op">{{ op }}</option>
       </select>
-      <input :value="node.property" @change="update('property', ($event.target as HTMLInputElement).value)" placeholder="字段" />
+      <input class="form-input" :value="node.property" @change="update('property', ($event.target as HTMLInputElement).value)" placeholder="字段" />
       <input
         v-if="node.operator !== 'between' && node.operator !== 'in'"
+        class="form-input"
         :value="String(node.value)"
         @change="update('value', ($event.target as HTMLInputElement).value)"
         placeholder="值"
@@ -16,7 +17,7 @@
     </div>
 
     <div v-else-if="node.type === 'logical'" class="logical">
-      <select :value="node.operator" @change="update('operator', ($event.target as HTMLSelectElement).value)">
+      <select class="form-select" :value="node.operator" @change="update('operator', ($event.target as HTMLSelectElement).value)">
         <option value="and">AND</option>
         <option value="or">OR</option>
       </select>
@@ -31,7 +32,7 @@
     </div>
 
     <div v-else-if="node.type === 'not'" class="not">
-      <span>NOT</span>
+      <span class="form-label">NOT</span>
       <FilterNodeEditor v-model:node="node.child" :data-schema="dataSchema" />
     </div>
   </div>
@@ -67,38 +68,61 @@ function update(key: string, value: unknown) {
 <style scoped>
 .filter-node-editor {
   margin: 4px 0;
-  padding: 6px;
-  background: #1a1a1a;
-  border-radius: 4px;
+  padding: 10px;
+  background: var(--elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
 }
+
 .comparison,
 .logical,
 .not {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
   align-items: center;
 }
+
 .children {
   width: 100%;
   padding-left: 16px;
-  border-left: 2px solid #333;
-  margin-top: 6px;
+  border-left: 2px solid var(--border);
+  margin-top: 8px;
 }
-input,
-select {
-  background: #222;
-  color: #fff;
-  border: 1px solid #444;
-  padding: 4px 6px;
-  border-radius: 4px;
+
+.form-input,
+.form-select {
+  padding: 8px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  outline: none;
 }
+
+.form-input:focus,
+.form-select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-dim);
+}
+
+.form-label {
+  font-size: 10px;
+  color: var(--dim);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+}
+
 .error {
-  color: #f87171;
+  color: var(--error);
   font-size: 11px;
 }
+
 .hint {
-  color: #888;
+  color: var(--dim);
   font-size: 11px;
 }
 </style>

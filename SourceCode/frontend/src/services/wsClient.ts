@@ -28,6 +28,8 @@ export interface WsClient {
   getDomains(): Promise<unknown>;
   setDomain(domain: string): Promise<unknown>;
   setDataSchema(dataSchema: unknown): Promise<unknown>;
+  listSampleDatasets(): Promise<unknown>;
+  getSampleDataset(id: string): Promise<unknown>;
   ping(): Promise<unknown>;
 }
 
@@ -126,6 +128,12 @@ export function createWsClient(options: WsClientOptions): WsClient {
   function setDataSchema(dataSchema: unknown) {
     return send('set_data_schema', { dataSchema });
   }
+  function listSampleDatasets() {
+    return send('list_sample_datasets', {});
+  }
+  function getSampleDataset(id: string) {
+    return send('get_sample_dataset', { id });
+  }
   function ping() {
     return send('ping', {});
   }
@@ -143,6 +151,8 @@ export function createWsClient(options: WsClientOptions): WsClient {
     getDomains,
     setDomain,
     setDataSchema,
+    listSampleDatasets,
+    getSampleDataset,
     ping,
   };
 }

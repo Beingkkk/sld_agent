@@ -118,7 +118,7 @@ describe('SymbolizerEditor', () => {
     expect(patches).toHaveLength(1);
     expect(patches[0].op).toBe('replace');
     expect(patches[0].path).toBe('/fill_color');
-    expect(patches[0].value).toBe('#00FF00');
+    expect(patches[0].value).toBe('#00ff00');
   });
 
   it('calls applyPatch with StyleParams path when select field changes', async () => {

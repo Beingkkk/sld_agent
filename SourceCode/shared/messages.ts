@@ -9,6 +9,8 @@ import type {
   GenerationResult,
   ImportStyleRequest,
   ModifyRequest,
+  SampleDatasetData,
+  SampleDatasetInfo,
   Style,
   ValidationError,
   ValidationReport,
@@ -44,6 +46,8 @@ export type RequestPayloads = {
   get_domains: Record<string, never>;
   set_domain: { domain: string };
   set_data_schema: { dataSchema: DataSchema };
+  list_sample_datasets: Record<string, never>;
+  get_sample_dataset: { id: string };
   ping: Record<string, never>;
 };
 
@@ -52,6 +56,8 @@ export type ResponsePayloads = {
   export_result: ExportResult;
   validation_result: { style: Style; validation: ValidationReport };
   domains_result: DomainsResult;
+  sample_datasets_list: { datasets: SampleDatasetInfo[] };
+  sample_dataset_data: SampleDatasetData;
   ok: OkPayload;
   error: ErrorPayload;
   pong: { timestamp: number };

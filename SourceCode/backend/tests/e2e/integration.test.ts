@@ -1,9 +1,12 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { WebSocket } from 'ws';
+import { fileURLToPath } from 'node:url';
 import { createServer } from '../../src/server.js';
 import type { WsServerOptions } from '../../src/types.js';
 import type { KnowledgeBase } from '../../src/knowledge/types.js';
 import type { StyleParams, StylePatch } from '@sldagent/shared/types';
+
+const DATA_DIR = fileURLToPath(new URL('../../../data', import.meta.url));
 
 class FakeLlmClient {
   constructor(private responses: object[]) {}
@@ -44,6 +47,7 @@ describe('Backend E2E Integration', () => {
     const options: WsServerOptions = {
       port: 0,
       knowledgeDir: '/dev/null',
+      dataDir: DATA_DIR,
       skipXsd: true,
       knowledgeBase,
     };
@@ -455,6 +459,7 @@ describe('Backend E2E Integration', () => {
     const testServer = createServer({
       port: 0,
       knowledgeDir: '/dev/null',
+      dataDir: DATA_DIR,
       skipXsd: true,
       knowledgeBase,
       llmClient,
@@ -494,5 +499,30 @@ describe('Backend E2E Integration', () => {
 
     testWs.close();
     await testServer.stop();
+  });
+
+  it('list_sample_datasets returns discovered datasets', async () => {
+    const result = await send('list_sample_datasets', {});
+    expect(result).toHaveProperty('datasets');
+    const datasets = (result as { datasets: Array<{ id: string; geometryType: string }> }).datasets;
+    const ids = datasets.map((d) => d.id).sort();
+    expect(ids).toContain('sld_cookbook_point');
+    expect(ids).toContain('sld_cookbook_line');
+    expect(ids).toContain('sld_cookbook_polygon');
+  });
+
+  it('get_sample_dataset returns GeoJSON for each geometry type', async () => {
+    const { datasets } = (await send('list_sample_datasets', {})) as { datasets: Array<{ id: string }> };
+    expect(datasets.length).toBeGreaterThanOrEqual(3);
+
+    for (const dataset of datasets) {
+      const result = await send('get_sample_dataset', { id: dataset.id });
+      expect(result).toHaveProperty('geojson');
+      expect(result).toHaveProperty('extent');
+      const data = result as { geojson: { type: string; features: unknown[] }; extent: number[] };
+      expect(data.geojson.type).toBe('FeatureCollection');
+      expect(data.geojson.features.length).toBeGreaterThan(0);
+      expect(data.extent.length).toBe(4);
+    }
   });
 });

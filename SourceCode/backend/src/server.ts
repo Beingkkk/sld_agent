@@ -44,6 +44,7 @@ export function createServer(options: WsServerOptions) {
         promptBuilder,
         sldService,
         llmClient,
+        dataDir: options.dataDir,
       });
       sessions.set(ws, session);
     }

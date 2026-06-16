@@ -3,6 +3,7 @@ import type { KnowledgeBase } from './knowledge/types.js';
 export interface WsServerOptions {
   port: number | 0;
   knowledgeDir: string;
+  dataDir?: string;
   configPath?: string;
   xsdPath?: string;
   xmllintPath?: string;

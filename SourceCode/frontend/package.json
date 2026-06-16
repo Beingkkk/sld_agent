@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
-    "build:electron": "tsc -p electron/tsconfig.json",
+    "build:electron": "tsc -p electron/tsconfig.json && node -e \"require('fs').copyFileSync('electron/preload.cjs', 'dist-electron/preload.cjs')\" && node -e \"try { require('fs').unlinkSync('dist-electron/preload.js'); } catch (_) {}\"",
     "preview": "vite preview",
     "electron:dev": "npm run build && npm run build:electron && electron .",
     "electron:build": "npm run build && npm run build:electron && electron-builder",

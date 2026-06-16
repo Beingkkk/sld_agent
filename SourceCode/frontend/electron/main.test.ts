@@ -5,6 +5,7 @@ import { EventEmitter } from 'node:events';
 const {
   mockLoadURL,
   mockBrowserWindow,
+  mockBrowserWindowFromWebContents,
   mockAppOn,
   mockAppIsPackaged,
   mockQuit,
@@ -17,7 +18,17 @@ const {
   mockLoadURL: vi.fn(),
   mockBrowserWindow: vi.fn(() => ({
     loadURL: mockLoadURL,
+    once: vi.fn((event, cb) => {
+      if (event === 'ready-to-show') cb();
+    }),
+    show: vi.fn(),
+    maximize: vi.fn(),
+    isMaximized: vi.fn().mockReturnValue(false),
+    isFullScreen: vi.fn().mockReturnValue(false),
+    setFullScreen: vi.fn(),
+    unmaximize: vi.fn(),
   })),
+  mockBrowserWindowFromWebContents: vi.fn(),
   mockAppOn: vi.fn(),
   mockAppIsPackaged: vi.fn().mockReturnValue(false),
   mockQuit: vi.fn(),
@@ -35,7 +46,9 @@ vi.mock('electron', () => ({
     on: mockAppOn,
     quit: mockQuit,
   },
-  BrowserWindow: mockBrowserWindow,
+  BrowserWindow: Object.assign(mockBrowserWindow, {
+    fromWebContents: mockBrowserWindowFromWebContents,
+  }),
   dialog: {
     showOpenDialog: mockDialogShowOpen,
     showSaveDialog: mockDialogShowSave,
@@ -73,6 +86,10 @@ const {
   createWindow,
   handleOpenAndRead,
   handleSaveAndWrite,
+  handleWindowMinimize,
+  handleWindowMaximize,
+  handleGetWindowState,
+  handleWindowClose,
   registerIpcHandlers,
   unregisterIpcHandlers,
 } = await import('./main');
@@ -148,25 +165,122 @@ describe('Electron main process', () => {
     expect(backend.kill).not.toHaveBeenCalled();
   });
 
-  it('creates development window with localhost URL and preload', () => {
-    createWindow(9876, false);
+  it('creates development window with file URL and preload', () => {
+    createWindow(9876);
     expect(mockBrowserWindow).toHaveBeenCalledTimes(1);
     expect(mockBrowserWindow).toHaveBeenCalledWith(
       expect.objectContaining({
+        frame: false,
+        resizable: true,
+        show: false,
         webPreferences: expect.objectContaining({
           nodeIntegration: false,
           contextIsolation: true,
-          preload: expect.stringMatching(/preload\.js$/),
+          sandbox: false,
+          preload: expect.stringMatching(/preload\.cjs$/),
         }),
       }),
     );
-    expect(mockBrowserWindow.mock.results[0].value.loadURL).toHaveBeenCalledWith('http://localhost:5173/?port=9876');
+    expect(mockBrowserWindow.mock.results[0].value.loadURL).toHaveBeenCalledWith(expect.stringContaining('file://'));
+    expect(mockBrowserWindow.mock.results[0].value.loadURL).toHaveBeenCalledWith(expect.stringContaining('?port=9876'));
   });
 
   it('creates packaged window with file URL and preload', () => {
-    const window = createWindow(9876, true);
+    const window = createWindow(9876);
     expect(window.loadURL).toHaveBeenCalledWith(expect.stringContaining('file://'));
     expect(window.loadURL).toHaveBeenCalledWith(expect.stringContaining('?port=9876'));
+  });
+
+  it('creates frameless resizable window with minimum size', () => {
+    createWindow(9876);
+    expect(mockBrowserWindow).toHaveBeenCalledWith(
+      expect.objectContaining({
+        frame: false,
+        resizable: true,
+        minWidth: 900,
+        minHeight: 600,
+      }),
+    );
+  });
+
+  it('maximizes window once ready-to-show', () => {
+    const window = createWindow(9876);
+    expect(window.maximize).toHaveBeenCalled();
+    expect(window.show).toHaveBeenCalled();
+  });
+
+  it('registers window control IPC handlers', () => {
+    registerIpcHandlers();
+    expect(mockIpcMainHandle).toHaveBeenCalledWith('window:minimize', handleWindowMinimize);
+    expect(mockIpcMainHandle).toHaveBeenCalledWith('window:maximize', handleWindowMaximize);
+    expect(mockIpcMainHandle).toHaveBeenCalledWith('window:getState', handleGetWindowState);
+    expect(mockIpcMainHandle).toHaveBeenCalledWith('window:close', handleWindowClose);
+  });
+
+  it('unregisters window control IPC handlers', () => {
+    unregisterIpcHandlers();
+    expect(mockIpcMainRemoveHandler).toHaveBeenCalledWith('window:minimize');
+    expect(mockIpcMainRemoveHandler).toHaveBeenCalledWith('window:maximize');
+    expect(mockIpcMainRemoveHandler).toHaveBeenCalledWith('window:getState');
+    expect(mockIpcMainRemoveHandler).toHaveBeenCalledWith('window:close');
+  });
+
+  it('minimizes window via IPC handler', () => {
+    const mockWin = { minimize: vi.fn() };
+    mockBrowserWindowFromWebContents.mockReturnValue(mockWin);
+    const fakeEvent = { sender: {} } as unknown as Electron.IpcMainInvokeEvent;
+    handleWindowMinimize(fakeEvent);
+    expect(mockBrowserWindowFromWebContents).toHaveBeenCalledWith(fakeEvent.sender);
+    expect(mockWin.minimize).toHaveBeenCalled();
+  });
+
+  it('maximizes window when not maximized', () => {
+    const mockWin = {
+      isMaximized: vi.fn().mockReturnValue(false),
+      isFullScreen: vi.fn().mockReturnValue(false),
+      maximize: vi.fn(),
+      unmaximize: vi.fn(),
+    };
+    mockBrowserWindowFromWebContents.mockReturnValue(mockWin);
+    const fakeEvent = { sender: {} } as unknown as Electron.IpcMainInvokeEvent;
+    const result = handleWindowMaximize(fakeEvent);
+    expect(result).toBe(true);
+    expect(mockWin.maximize).toHaveBeenCalled();
+    expect(mockWin.unmaximize).not.toHaveBeenCalled();
+  });
+
+  it('unmaximizes window when already maximized', () => {
+    const mockWin = {
+      isMaximized: vi.fn().mockReturnValue(true),
+      isFullScreen: vi.fn().mockReturnValue(false),
+      maximize: vi.fn(),
+      unmaximize: vi.fn(),
+    };
+    mockBrowserWindowFromWebContents.mockReturnValue(mockWin);
+    const fakeEvent = { sender: {} } as unknown as Electron.IpcMainInvokeEvent;
+    const result = handleWindowMaximize(fakeEvent);
+    expect(result).toBe(false);
+    expect(mockWin.unmaximize).toHaveBeenCalled();
+    expect(mockWin.maximize).not.toHaveBeenCalled();
+  });
+
+  it('returns window state via IPC handler', () => {
+    const mockWin = {
+      isMaximized: vi.fn().mockReturnValue(true),
+      isFullScreen: vi.fn().mockReturnValue(false),
+    };
+    mockBrowserWindowFromWebContents.mockReturnValue(mockWin);
+    const fakeEvent = { sender: {} } as unknown as Electron.IpcMainInvokeEvent;
+    const result = handleGetWindowState(fakeEvent);
+    expect(result).toEqual({ isMaximized: true, isFullScreen: false });
+  });
+
+  it('closes window via IPC handler', () => {
+    const mockWin = { close: vi.fn() };
+    mockBrowserWindowFromWebContents.mockReturnValue(mockWin);
+    const fakeEvent = { sender: {} } as unknown as Electron.IpcMainInvokeEvent;
+    handleWindowClose(fakeEvent);
+    expect(mockWin.close).toHaveBeenCalled();
   });
 });
 

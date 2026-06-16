@@ -32,6 +32,7 @@ export interface AgentSessionOptions {
   promptBuilder: PromptBuilder;
   sldService: unknown;
   llmClient: unknown;
+  dataDir?: string;
 }
 
 export interface IAgentSession {

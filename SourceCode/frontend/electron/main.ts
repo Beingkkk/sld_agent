@@ -14,7 +14,10 @@ export function resolveBackendPath(isPackaged: boolean): string {
 }
 
 export async function startBackend(backendPath: string): Promise<{ port: number; process: ChildProcess }> {
-  const backend = spawn(process.execPath, [backendPath], {
+  const nodePath = process.execPath.endsWith('node') || process.execPath.endsWith('node.exe')
+    ? process.execPath
+    : 'node';
+  const backend = spawn(nodePath, [backendPath], {
     env: { ...process.env, SLD_PORT: '0' },
   });
 
@@ -47,20 +50,27 @@ export function stopBackend(backend: ChildProcess): void {
   }
 }
 
-export function createWindow(port: number, isPackaged: boolean): BrowserWindow {
+export function createWindow(port: number): BrowserWindow {
   const window = new BrowserWindow({
-    width: 1440,
-    height: 900,
+    minWidth: 900,
+    minHeight: 600,
+    frame: false,
+    resizable: true,
+    show: false,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      preload: resolve(__dirname, 'preload.js'),
+      sandbox: false,
+      preload: resolve(__dirname, 'preload.cjs'),
     },
   });
 
-  const rendererUrl = isPackaged
-    ? `file://${resolve(__dirname, '../dist/index.html')}?port=${port}`
-    : `http://localhost:5173/?port=${port}`;
+  window.once('ready-to-show', () => {
+    window.maximize();
+    window.show();
+  });
+
+  const rendererUrl = `file://${resolve(__dirname, '../dist/index.html')}?port=${port}`;
 
   window.loadURL(rendererUrl);
   return window;
@@ -92,14 +102,57 @@ export async function handleSaveAndWrite(
   return result.filePath;
 }
 
+export function handleWindowMinimize(
+  event: Electron.IpcMainInvokeEvent,
+): void {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  win?.minimize();
+}
+
+export function handleWindowMaximize(
+  event: Electron.IpcMainInvokeEvent,
+): boolean {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win) return false;
+  if (win.isMaximized()) {
+    win.unmaximize();
+    return false;
+  }
+  win.maximize();
+  return true;
+}
+
+export function handleGetWindowState(
+  event: Electron.IpcMainInvokeEvent,
+): { isMaximized: boolean; isFullScreen: boolean } {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win) return { isMaximized: false, isFullScreen: false };
+  return { isMaximized: win.isMaximized(), isFullScreen: win.isFullScreen() };
+}
+
+export function handleWindowClose(
+  event: Electron.IpcMainInvokeEvent,
+): void {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  win?.close();
+}
+
 export function registerIpcHandlers(): void {
   ipcMain.handle('dialog:openAndRead', handleOpenAndRead);
   ipcMain.handle('dialog:saveAndWrite', handleSaveAndWrite);
+  ipcMain.handle('window:minimize', handleWindowMinimize);
+  ipcMain.handle('window:maximize', handleWindowMaximize);
+  ipcMain.handle('window:getState', handleGetWindowState);
+  ipcMain.handle('window:close', handleWindowClose);
 }
 
 export function unregisterIpcHandlers(): void {
   ipcMain.removeHandler('dialog:openAndRead');
   ipcMain.removeHandler('dialog:saveAndWrite');
+  ipcMain.removeHandler('window:minimize');
+  ipcMain.removeHandler('window:maximize');
+  ipcMain.removeHandler('window:getState');
+  ipcMain.removeHandler('window:close');
 }
 
 // Production entry point. Tests set SLD_ELECTRON_TEST=true to skip this block.
@@ -111,27 +164,25 @@ if (process.env.SLD_ELECTRON_TEST !== 'true') {
     registerIpcHandlers();
     const result = await startBackend(resolveBackendPath(app.isPackaged));
     backendProcess = result.process;
-    mainWindow = createWindow(result.port, app.isPackaged);
+    mainWindow = createWindow(result.port);
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) {
-        mainWindow = createWindow(result.port, app.isPackaged);
+        mainWindow = createWindow(result.port);
       }
     });
   });
 
   app.on('window-all-closed', () => {
-    if (backendProcess) {
-      stopBackend(backendProcess);
-    }
     if (process.platform !== 'darwin') {
       app.quit();
     }
   });
 
   app.on('before-quit', () => {
-    if (backendProcess) {
+    if (backendProcess && !backendProcess.killed) {
       stopBackend(backendProcess);
+      backendProcess = null;
     }
   });
 }

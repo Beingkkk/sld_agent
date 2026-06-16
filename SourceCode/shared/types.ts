@@ -209,3 +209,54 @@ export interface SymbolizerParams {
   kind: 'Mark' | 'Line' | 'Fill' | 'Text' | 'Raster';
   [key: string]: unknown;
 }
+
+/** Metadata for a discovered sample vector dataset. */
+export interface SampleDatasetInfo {
+  /** Dataset identifier, typically the shapefile basename without extension. */
+  id: string;
+  /** Human-readable name derived from the directory or file name. */
+  name: string;
+  /** Geometry type of the dataset. */
+  geometryType: 'point' | 'line' | 'polygon';
+  /** Coordinate reference system as a PROJ/EPSG string, e.g. "EPSG:4326". */
+  crs: string;
+  /** Number of features in the dataset. */
+  featureCount: number;
+  /** Relative path to the dataset directory for debugging. */
+  path: string;
+}
+
+/** Full payload returned when loading a sample dataset. */
+export interface SampleDatasetData {
+  id: string;
+  name: string;
+  geometryType: 'point' | 'line' | 'polygon';
+  crs: string;
+  featureCount: number;
+  /** GeoJSON FeatureCollection in the dataset's source CRS. */
+  geojson: GeoJSONFeatureCollection;
+  /** Bounding box in the source CRS as [minX, minY, maxX, maxY]. */
+  extent: [number, number, number, number];
+}
+
+/** A GeoJSON FeatureCollection. */
+export interface GeoJSONFeatureCollection {
+  type: 'FeatureCollection';
+  features: GeoJSONFeature[];
+}
+
+/** A GeoJSON Feature. */
+export interface GeoJSONFeature {
+  type: 'Feature';
+  geometry: GeoJSONGeometry;
+  properties: Record<string, unknown>;
+}
+
+/** Supported GeoJSON geometry types. */
+export type GeoJSONGeometry =
+  | { type: 'Point'; coordinates: [number, number] }
+  | { type: 'LineString'; coordinates: [number, number][] }
+  | { type: 'Polygon'; coordinates: [number, number][][] }
+  | { type: 'MultiPoint'; coordinates: [number, number][] }
+  | { type: 'MultiLineString'; coordinates: [number, number][][] }
+  | { type: 'MultiPolygon'; coordinates: [number, number][][][] };

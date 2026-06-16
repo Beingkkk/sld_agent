@@ -61,6 +61,14 @@ export function createRouter() {
           session.setDataSchema((payload as RequestPayloads['set_data_schema']).dataSchema);
           return { type: 'ok', requestId, payload: { ok: true } };
         }
+        case 'list_sample_datasets': {
+          const result = await session.listSampleDatasets();
+          return { type: 'sample_datasets_list', requestId, payload: result };
+        }
+        case 'get_sample_dataset': {
+          const result = await session.getSampleDataset((payload as RequestPayloads['get_sample_dataset']).id);
+          return { type: 'sample_dataset_data', requestId, payload: result };
+        }
         case 'ping':
           return { type: 'pong', requestId, payload: { timestamp: Date.now() } };
         default:

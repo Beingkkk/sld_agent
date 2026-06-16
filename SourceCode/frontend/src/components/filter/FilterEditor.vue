@@ -3,7 +3,8 @@
     <div v-if="isEmpty" class="empty">当前规则没有过滤条件</div>
     <FilterNodeEditor v-else v-model:node="rootNode" :data-schema="dataSchema" />
     <div class="cql-preview" v-if="cql">
-      <strong>CQL:</strong> {{ cql }}
+      <div class="cql-preview-label">CQL 预览</div>
+      <div>{{ cql }}</div>
     </div>
   </div>
 </template>
@@ -37,18 +38,43 @@ const cql = computed(() => toCql(props.filter as unknown as import('@shared/filt
 
 <style scoped>
 .filter-editor {
-  padding: 8px;
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
+
+.params-empty,
 .empty {
-  color: #888;
-}
-.cql-preview {
-  margin-top: 12px;
-  padding: 8px;
-  background: #1a1a1a;
-  border-radius: 4px;
-  color: #aaa;
-  font-family: monospace;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: var(--dim);
   font-size: 12px;
+  padding: 40px 20px;
+}
+
+.cql-preview {
+  padding: 14px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.cql-preview-label {
+  font-size: 10px;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 8px;
+  font-weight: 600;
 }
 </style>

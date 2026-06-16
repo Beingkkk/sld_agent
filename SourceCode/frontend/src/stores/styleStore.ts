@@ -4,6 +4,8 @@ import type {
   ChatMessage,
   DomainsResult,
   GenerationResult,
+  SampleDatasetData,
+  SampleDatasetInfo,
   Style,
   StyleParams,
   StylePatch,
@@ -34,9 +36,13 @@ export const useStyleStore = defineStore('style', () => {
   const chatHistory = ref<ChatMessage[]>([]);
   const busy = ref(false);
   const connected = ref(false);
+  const sampleDatasets = ref<SampleDatasetInfo[]>([]);
+  const activeDataset = ref<SampleDatasetData | undefined>();
+  const datasetError = ref<string | undefined>();
 
   wsClient.connect().then(() => {
     connected.value = true;
+    return loadSampleDatasets();
   }).catch(() => {
     connected.value = false;
   });
@@ -118,6 +124,43 @@ export const useStyleStore = defineStore('style', () => {
     return result;
   }
 
+  async function loadSampleDatasets() {
+    if (!connected.value) return;
+    try {
+      const result = (await wsClient.listSampleDatasets()) as { datasets: SampleDatasetInfo[] };
+      sampleDatasets.value = result.datasets ?? [];
+      datasetError.value = undefined;
+    } catch (err) {
+      sampleDatasets.value = [];
+      datasetError.value = err instanceof Error ? err.message : String(err);
+    }
+  }
+
+  async function loadSampleDataset(id: string) {
+    if (!connected.value || !id) return;
+    try {
+      const result = (await wsClient.getSampleDataset(id)) as SampleDatasetData;
+      activeDataset.value = result;
+      datasetError.value = undefined;
+    } catch (err) {
+      activeDataset.value = undefined;
+      datasetError.value = err instanceof Error ? err.message : String(err);
+    }
+  }
+
+  async function selectDatasetForGeometry(geometryType?: string) {
+    if (!geometryType || sampleDatasets.value.length === 0) return;
+    const target = geometryType === 'linestring' ? 'line' : geometryType;
+    const dataset = sampleDatasets.value.find((d) => d.geometryType === target);
+    if (dataset && dataset.id !== activeDataset.value?.id) {
+      await loadSampleDataset(dataset.id);
+    }
+  }
+
+  function clearChat() {
+    chatHistory.value = [];
+  }
+
   function applyResult(result: GenerationResult) {
     currentStyle.value = result.style;
     lastValidStyle.value = result.style;
@@ -125,6 +168,7 @@ export const useStyleStore = defineStore('style', () => {
     params.value = result.params;
     validation.value = result.validation;
     explanation.value = result.explanation;
+    selectDatasetForGeometry(result.params.geometry_type).catch(() => undefined);
   }
 
   return {
@@ -137,13 +181,20 @@ export const useStyleStore = defineStore('style', () => {
     chatHistory: computed(() => chatHistory.value),
     busy: computed(() => busy.value),
     connected: computed(() => connected.value),
+    sampleDatasets: computed(() => sampleDatasets.value),
+    activeDataset: computed(() => activeDataset.value),
+    datasetError: computed(() => datasetError.value),
     generate,
     modify,
     applyPatch,
+    clearChat,
     applyResult,
     importStyle,
     exportSld,
     validate,
     setDomain,
+    loadSampleDatasets,
+    loadSampleDataset,
+    selectDatasetForGeometry,
   };
 });
