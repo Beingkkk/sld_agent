@@ -18,7 +18,7 @@
         <span v-if="validation.roundtrip.message"> — {{ validation.roundtrip.message }}</span>
       </div>
 
-      <ul v-if="validation.errors.length" class="errors">
+      <ul v-if="validation?.errors?.length" class="errors">
         <li v-for="(err, idx) in validation.errors" :key="idx">
           [{{ err.source }}] {{ err.message }}
           <span v-if="err.location"> ({{ err.location }})</span>

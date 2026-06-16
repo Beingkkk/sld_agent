@@ -49,7 +49,7 @@
       {
         "from": "../backend",
         "to": "backend",
-        "filter": ["dist/**/*", "knowledge/**/*", "package.json"]
+        "filter": ["dist/**/*", "knowledge/**/*", "package.json", "resources/**/*"]
       },
       {
         "from": "../backend/node_modules",

@@ -1,6 +1,6 @@
 <template>
   <div class="filter-editor">
-    <div v-if="!rootNode" class="empty">当前规则没有过滤条件</div>
+    <div v-if="isEmpty" class="empty">当前规则没有过滤条件</div>
     <FilterNodeEditor v-else v-model:node="rootNode" :data-schema="dataSchema" />
     <div class="cql-preview" v-if="cql">
       <strong>CQL:</strong> {{ cql }}
@@ -17,7 +17,7 @@ import type { FilterNode } from '@shared/filter';
 import FilterNodeEditor from './FilterNodeEditor.vue';
 
 const props = defineProps<{
-  filter: Filter;
+  filter?: Filter;
   dataSchema?: DataSchema;
 }>();
 
@@ -29,6 +29,8 @@ const rootNode = computed({
   get: () => toFilterNode(props.filter as unknown as import('@shared/filter').GeoStylerFilter),
   set: (node: FilterNode) => emit('update:filter', toGeoStylerFilter(node) as unknown as Filter),
 });
+
+const isEmpty = computed(() => !props.filter || (Array.isArray(props.filter) && props.filter.length === 0));
 
 const cql = computed(() => toCql(props.filter as unknown as import('@shared/filter').GeoStylerFilter));
 </script>

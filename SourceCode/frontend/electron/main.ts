@@ -1,58 +1,53 @@
 import { app, BrowserWindow } from 'electron';
-import { spawn, ChildProcess } from 'node:child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-let backend: ChildProcess | null = null;
-let mainWindow: BrowserWindow | null = null;
-
-function resolveBackendPath(): string {
-  if (app.isPackaged) {
+export function resolveBackendPath(isPackaged: boolean): string {
+  if (isPackaged) {
     return resolve(process.resourcesPath, 'backend', 'dist', 'index.js');
   }
   return resolve(__dirname, '../../backend/dist/index.js');
 }
 
-async function startBackend(): Promise<number> {
-  const backendPath = resolveBackendPath();
-  backend = spawn(process.execPath, [backendPath], {
+export async function startBackend(backendPath: string): Promise<{ port: number; process: ChildProcess }> {
+  const backend = spawn(process.execPath, [backendPath], {
     env: { ...process.env, SLD_PORT: '0' },
   });
 
-  return new Promise((resolve, reject) => {
+  return new Promise((resolvePromise, reject) => {
     const onError = (err: Error) => reject(err);
-    backend!.on('error', onError);
+    backend.on('error', onError);
 
     const onData = (data: Buffer) => {
       const line = data.toString();
       const match = line.match(/READY ws:\/\/localhost:(\d+)/);
       if (match) {
-        backend!.stdout?.off('data', onData);
-        backend!.off('error', onError);
-        resolve(parseInt(match[1], 10));
+        backend.stdout?.off('data', onData);
+        backend.off('error', onError);
+        resolvePromise({ port: parseInt(match[1], 10), process: backend });
       }
     };
 
-    backend!.stdout?.on('data', onData);
+    backend.stdout?.on('data', onData);
 
     setTimeout(() => {
-      backend!.stdout?.off('data', onData);
+      backend.stdout?.off('data', onData);
       reject(new Error('Backend start timeout'));
     }, 10000);
   });
 }
 
-function stopBackend(): void {
+export function stopBackend(backend: ChildProcess): void {
   if (backend && !backend.killed) {
     backend.kill('SIGTERM');
-    backend = null;
   }
 }
 
-function createWindow(port: number): void {
-  mainWindow = new BrowserWindow({
+export function createWindow(port: number, isPackaged: boolean): BrowserWindow {
+  const window = new BrowserWindow({
     width: 1440,
     height: 900,
     webPreferences: {
@@ -61,31 +56,43 @@ function createWindow(port: number): void {
     },
   });
 
-  const rendererUrl = app.isPackaged
+  const rendererUrl = isPackaged
     ? `file://${resolve(__dirname, '../dist/index.html')}?port=${port}`
     : `http://localhost:5173/?port=${port}`;
 
-  mainWindow.loadURL(rendererUrl);
+  window.loadURL(rendererUrl);
+  return window;
 }
 
-app.whenReady().then(async () => {
-  const port = await startBackend();
-  createWindow(port);
+// Production entry point. Tests set SLD_ELECTRON_TEST=true to skip this block.
+if (process.env.SLD_ELECTRON_TEST !== 'true') {
+  let backendProcess: ChildProcess | null = null;
+  let mainWindow: BrowserWindow | null = null;
 
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow(port);
+  app.whenReady().then(async () => {
+    const result = await startBackend(resolveBackendPath(app.isPackaged));
+    backendProcess = result.process;
+    mainWindow = createWindow(result.port, app.isPackaged);
+
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) {
+        mainWindow = createWindow(result.port, app.isPackaged);
+      }
+    });
+  });
+
+  app.on('window-all-closed', () => {
+    if (backendProcess) {
+      stopBackend(backendProcess);
+    }
+    if (process.platform !== 'darwin') {
+      app.quit();
     }
   });
-});
 
-app.on('window-all-closed', () => {
-  stopBackend();
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
-});
-
-app.on('before-quit', () => {
-  stopBackend();
-});
+  app.on('before-quit', () => {
+    if (backendProcess) {
+      stopBackend(backendProcess);
+    }
+  });
+}
