@@ -32,12 +32,12 @@ OGC XSD 校验（xmllint / xmllint-wasm）+ Parser Roundtrip 校验
 
 ## 当前阶段
 
-MVP 代码骨架与核心模块已实现并提交到 `main`：
+MVP 核心模块已实现，后端 63 个测试、前端 67 个测试全部通过，工作区已清理。当前代码位于 `feature/post-mvp-cleanup` 分支，尚未合并到 `main`。
 
 - **SDD 文档**：`Document/constitution.md`、`spec.md`、5 个 `plan-{module}.md`、`design/` 已冻结或按 proposal 流程更新。
-- **后端**：`SourceCode/backend/` 已实现 WebSocket 服务、AgentSession、StyleBuilder、SldService、KnowledgeBaseLoader、PromptBuilder、LlmClient，单元测试 + e2e 流水线测试共 **63** 个全部通过。
-- **前端**：`SourceCode/frontend/` 已实现 Vue 3 + Electron 骨架、Pinia Store、WebSocket 客户端、MapPreview、Inspector、Assistant、Toolbar、StatusBar 及组件（SymbolizerEditor、ValidationPanel、FilterEditor），单元/组件/Electron 主进程测试共 **67** 个全部通过。
-- **Spikes**：`spike/` 下已完成的 P0 结论已反向同步到设计文档；P1/P2 目录保留未跟踪，不进入版本控制。
+- **后端**：`SourceCode/backend/` 已实现 WebSocket 服务、AgentSession、StyleBuilder、SldService、KnowledgeBaseLoader、PromptBuilder、LlmClient。
+- **前端**：`SourceCode/frontend/` 已实现 Vue 3 + Electron 骨架、Pinia Store、WebSocket 客户端、MapPreview、Inspector、Assistant、Toolbar、StatusBar 及参数/规则/Filter 编辑组件。
+- **共享包**：`SourceCode/shared/` 已抽离为 `@sldagent/shared`，前后端通过统一包引用，不再维护后端内部副本。
 
 ## 高层架构
 
@@ -61,7 +61,7 @@ MVP 代码骨架与核心模块已实现并提交到 `main`：
 5. **知识库驱动默认值与 Prompt**：启动时加载 `knowledge/root.json` + 领域文件（`default.json`、`transport.json`、`landuse.json`）；对象字段业务领域覆盖 `default`，数组字段业务领域前置，同时仅激活一个业务领域。
 6. **Filter 中间表示**：后端/UI 模型使用 GeoStyler Filter 数组；UI 使用 `FilterNode` 树；CQL 用于只读预览。
 7. **XSD 校验策略**：开发期使用系统 `xmllint`；生产打包使用 `xmllint-wasm` + 本地 OGC schema bundle；缺失时降级为 Parser Roundtrip + XML 语法校验。
-8. **Electron/WebSocket 启动模式**：Electron 主进程启动 Node 后端，解析 stdout 中的 `READY ws://localhost:{port}` 后再加载渲染页 `file://renderer/index.html?port={port}`；渲染进程通过原生 `WebSocket` 直连后端。
+8. **Electron/WebSocket 启动模式**：Electron 主进程启动 Node 后端，解析 stdout 中的 `READY ws://localhost:{port}` 后再加载渲染页；渲染进程通过原生 `WebSocket` 直连后端，不经过 IPC 转发。
 
 ## 工具使用偏好
 
@@ -92,14 +92,15 @@ MVP 代码骨架与核心模块已实现并提交到 `main`：
 
 ```bash
 cd SourceCode/backend
-npm install
-npm run dev          # tsx 开发启动（输出 READY 行）
-npm run build        # 编译到 dist/（含共享包 build:shared）
-npm run test         # 先 build:shared，再运行 vitest 全部测试（含 tests/e2e）
+npm install              # 会同步链接 ../shared 到 node_modules/@sldagent/shared
+npm run dev              # tsx 开发启动（输出 READY ws://localhost:{port}）
+npm run start            # 运行 dist/index.js（需先 build）
+npm run build            # 编译到 dist/（含共享包 build:shared）
+npm run test             # 先 build:shared，再运行 vitest 全部测试（含 tests/e2e）
 npx vitest run tests/unit/AgentSession.test.ts   # 单个测试文件
 npx vitest run tests/e2e/integration.test.ts     # 仅运行 e2e 流水线测试
-npm run typecheck    # build:shared + tsc --noEmit
-npm run lint         # eslint（当前缺少 ESLint 配置，会失败）
+npm run typecheck        # build:shared + tsc --noEmit
+npm run lint             # eslint（当前缺少 ESLint 配置，会失败）
 ```
 
 ### 前端
@@ -107,22 +108,23 @@ npm run lint         # eslint（当前缺少 ESLint 配置，会失败）
 ```bash
 cd SourceCode/frontend
 npm install
-npm run dev          # Vite 开发服务器
-npm run build        # vue-tsc + vite build
-npm run test         # vitest（含 tests/unit、src/**/*.test.ts、electron/**/*.test.ts）
+npm run dev              # Vite 开发服务器
+npm run build            # vue-tsc + vite build
+npm run test             # vitest（含 tests/unit、src/**/*.test.ts、electron/**/*.test.ts）
 npx vitest run src/components/SymbolizerEditor.test.ts   # 单个组件测试
 npx vitest run electron/main.test.ts                     # Electron 主进程测试
-npm run typecheck    # vue-tsc --noEmit
-npm run lint         # eslint src electron（当前缺少 ESLint 配置，会失败）
-npm run electron:dev # Electron 开发模式
-npm run electron:build # Electron 打包
+npm run typecheck        # vue-tsc --noEmit
+npm run lint             # eslint src electron（当前缺少 ESLint 配置，会失败）
+npm run electron:dev     # Electron 开发模式（需同时运行 npm run dev 提供 5173）
+npm run electron:build   # Electron 打包
 ```
 
 ### 端到端开发流程
 
-1. 复制或创建 `SourceCode/config/config.json` 并填写 LLM 端点与 API Key。
-2. 启动后端：`cd SourceCode/backend && npm run build && node dist/index.js`，记录输出的端口。
-3. 启动前端：`cd SourceCode/frontend && npm run dev`，浏览器访问 `http://localhost:5173/?port={后端端口}`。
+1. 复制 `SourceCode/config/config.example.json` 到 `SourceCode/config/config.json` 并填写 LLM 端点与 API Key。
+2. 启动后端：`cd SourceCode/backend && npm run dev`，记录输出的端口。
+3. 浏览器模式：`cd SourceCode/frontend && npm run dev`，访问 `http://localhost:5173/?port={后端端口}`。
+4. Electron 模式：终端 A 运行 `npm run dev`；终端 B 运行 `npm run electron:dev`，Electron 主进程会自动拉起后端。
 
 ### Spikes
 
@@ -138,57 +140,30 @@ cd spike/openlayers-preview && npm install && npm test
 
 - **SourceCode/shared/**：前后端共享的类型定义、`WsMessage` 契约、`FilterNode` 适配器、CQL 转换以及 `applyPatches` patch 工具。
   - 前端通过 `@shared` 别名引用（`vite.config.ts` 中配置为 `../shared`）。
-  - 后端通过 npm `file:../shared` 依赖以 `@sldagent/shared` 包形式引用，不再维护独立副本。
+  - 后端通过 npm `file:../shared` 依赖以 `@sldagent/shared` 包形式引用。
   - 变更共享包后，后端 `npm run test` / `npm run typecheck` 会自动重新编译；前端 `vite` 开发模式直接读取源码，无需手动构建。
 - **前端内部**：`@/` 别名指向 `SourceCode/frontend/src/`。
 
-## 已知设计债与实现注意
+## 已验证的关键约束
 
-1. ~~`apply_patch` 目标语义不一致~~：已按 [`Document/changes/proposal-0005.md`](Document/changes/proposal-0005.md) 统一为 `StyleParams`，前后端与接口契约文档已对齐；新增 [`SourceCode/shared/patch.ts`](SourceCode/shared/patch.ts) 作为共享 patch 工具，支持 `replace` / `add` / `remove`。`SymbolizerEditor` 与 `RulesPanel` 已迁移到 `StyleParams` 路径。
-2. **`SldService` 的 XSD/Roundtrip 组件已拆分**：按 [`Document/changes/proposal-0003.md`](Document/changes/proposal-0003.md) 拆分为 `SldParserWrapper`、`XsdValidator`、`RoundtripValidator`、`ValidationReporter` 独立模块；`SldService` 现为薄门面。
-3. ~~`RuleGenerator` 近似实现~~：已按 [`Document/changes/proposal-0004.md`](Document/changes/proposal-0004.md) 接入 `PropertySchema.samples`，`quantile` / `naturalBreaks` 现在基于真实采样值计算断点，采样不足时回退到 `equalInterval`。
-4. **前端组件测试已补齐**：FilterEditor、FilterNodeEditor、SymbolizerEditor、ValidationPanel、MapPreview 均已添加 `@vue/test-utils` 测试；Electron 主进程集成测试已覆盖 `main.ts` 中路径解析/启动/窗口创建逻辑。
-5. ~~`SourceCode/backend/src/shared/` 与 `SourceCode/shared/` 重复~~：已迁移为 `@sldagent/shared` 包，重复副本已删除。
+以下约束已在 Spike 中验证，并反向同步到设计文档，编码时应直接遵循：
 
-## Spike 已验证约束
-
-以下约束已在 Spike 中验证，并已反向同步到设计文档：
-
-1. **`elseFilter` 无法 roundtrip**  
-   `geostyler-sld-parser@9.0.1` 会丢弃 `Rule.elseFilter`。分类默认规则必须使用显式 Filter：  
-   `['&&', ['!=', field, v1], ['!=', field, v2], ...]`。  
-   见 [`Document/design/style-builder.md`](Document/design/style-builder.md) §6.2。
-
-2. **symbolizer 内 `<Geometry>` 会导致 `readStyle` 崩溃**  
-   导入含显式 `<Geometry><ogc:PropertyName>...</ogc:PropertyName></Geometry>` 的 SLD 会抛异常，导入前需剥离。  
-   见 [`Document/design/sld-service.md`](Document/design/sld-service.md) §5。
-
-3. **`xmllint-wasm` 需要完整 OGC schema bundle**  
-   仅传入 `StyledLayerDescriptor.xsd` 会失败。必须 preload `xlink.xsd`、`xml.xsd`、`filter.xsd`、`expr.xsd`、`geometry.xsd`、`gml.xsd`、`feature.xsd`，并将 `schemaLocation` 改写为本地相对文件名。  
-   见 [`Document/design/xmllint-packaging.md`](Document/design/xmllint-packaging.md) §4.2。
-
-4. **LLM 会发明语义别名**  
-   文本样式中模型可能输出 `font_color` 而非 schema 标准字段 `stroke_color`。`ParamsNormalizer` 在 schema 校验后将已知别名映射为标准字段。  
-   见 [`Document/design/style-builder.md`](Document/design/style-builder.md) §4。
-
-5. **知识库合并规则**  
-   `default.json` 始终加载；单个业务领域文件与 `default` 合并时，对象字段由业务领域覆盖，数组字段（`few_shot_examples`、`modification_rules`、`constraints`）由业务领域前置。  
-   见 [`Document/design/style-builder.md`](Document/design/style-builder.md) §8.1 与 [`Document/design/agent-session.md`](Document/design/agent-session.md) §3.5。
-
-6. **渲染进程直接通过 WebSocket 通信**  
-   Electron 主进程只负责启动/停止 Node 后端并通过 URL 查询参数传递端口；渲染进程使用原生 `WebSocket` 直连，不经过 IPC 转发。  
-   见 [`Document/design/interface-contracts.md`](Document/design/interface-contracts.md) §9。
-
-7. **OpenLayers 预览覆盖 MVP 全部 Must Have 样式**  
-   `geostyler-openlayers-parser` 可稳定渲染 simple / categorized / classified / text / scale-denominator；`Mark` 的多种 `wellKnownName` 通过 SVG Icon 实现；线/面属性、虚线、透明度、旋转均正确转换。渐变、图案填充、图案线型不支持或仅部分支持；预览与 GeoServer 最终效果存在差异，需在 UI 中提示。  
-   见 [`spike/openlayers-preview/result.md`](spike/openlayers-preview/result.md) 与 [`Document/design/requirements.md`](Document/design/requirements.md) §3.6。
+1. **`elseFilter` 无法 roundtrip** — `geostyler-sld-parser@9.0.1` 会丢弃 `Rule.elseFilter`，分类默认规则必须使用显式 Filter。见 [`Document/design/style-builder.md`](Document/design/style-builder.md) §6.2。
+2. **symbolizer 内 `<Geometry>` 会导致 `readStyle` 崩溃** — 导入含显式 `<Geometry>` 的 SLD 前需剥离。见 [`Document/design/sld-service.md`](Document/design/sld-service.md) §5。
+3. **`xmllint-wasm` 需要完整 OGC schema bundle** — 必须 preload `xlink.xsd`、`xml.xsd`、`filter.xsd`、`expr.xsd`、`geometry.xsd`、`gml.xsd`、`feature.xsd`。见 [`Document/design/xmllint-packaging.md`](Document/design/xmllint-packaging.md) §4.2。
+4. **LLM 会发明语义别名** — 如文本样式中可能输出 `font_color`，需经 `ParamsNormalizer` 映射为 `stroke_color`。见 [`Document/design/style-builder.md`](Document/design/style-builder.md) §4。
+5. **知识库合并规则** — `default.json` 始终加载；对象字段由业务领域覆盖，数组字段（`few_shot_examples`、`modification_rules`、`constraints`）由业务领域前置。见 [`Document/design/style-builder.md`](Document/design/style-builder.md) §8.1。
+6. **渲染进程直接通过 WebSocket 通信** — Electron 主进程只负责启动/停止 Node 后端并通过 URL 查询参数传递端口。见 [`Document/design/interface-contracts.md`](Document/design/interface-contracts.md) §9。
+7. **OpenLayers 预览与 GeoServer 效果存在差异** — 渐变、图案填充、图案线型不支持或仅部分支持，需在 UI 中提示。见 [`spike/openlayers-preview/result.md`](spike/openlayers-preview/result.md)。
 
 ## 本地资源与忽略文件
 
-- **LLM 连接配置**：`SourceCode/config/config.json`（本地文件，不提交，已由 `.gitignore` 排除）。
-- **XSD 与参考文档**：`Document/Research/`（本地目录，不提交，已由 `.gitignore` 排除）。开发中若需要 SLD 1.0.0 XSD，可从 `spike/parser-e2e/schemas-local/` 或 `spike/xmllint-wasm-bundle/` 获取。
+- **LLM 连接配置**：`SourceCode/config/config.json`（本地文件，不提交，已由 `.gitignore` 排除）。已跟踪的模板见 `SourceCode/config/config.example.json`。
+- **XSD 与参考文档**：`Document/Research/`（本地目录，不提交）。开发中若需要 SLD 1.0.0 XSD，可从 `spike/parser-e2e/schemas-local/` 或 `spike/xmllint-wasm-bundle/` 获取。
 - **Schema bundle 下载脚本原型**：[`spike/xmllint-wasm-bundle/scripts/download-sld-schemas.js`](spike/xmllint-wasm-bundle/scripts/download-sld-schemas.js)
 - **UX 交互原型**：[`Document/UX/index.html`](Document/UX/index.html)
+- **CodeGraph 索引数据**：`.codegraph/`（本地数据，不提交）。
+- **Spike 目录**：`spike/`（本地验证目录，不进入版本控制）。
 
 ## 关键约束
 
@@ -199,14 +174,6 @@ cd spike/openlayers-preview && npm install && npm test
 - **不使用 RAG**；知识以预结构化 JSON 形式注入 LLM 上下文。
 - **GeoStyler 是 SLD 解析与生成的唯一真相源**；前后端使用同一版本 `geostyler-sld-parser`。
 - SLD XML 对用户是只读产物，不开放直接编辑；用户编辑对象是 GeoStyler Style 中间表示。
-
-## 下一步
-
-1. ~~拆分 `SldService` 内部模块~~：已完成，见 [`Document/changes/proposal-0003.md`](Document/changes/proposal-0003.md)。
-2. ~~接入原始要素采样值~~：已完成，见 [`Document/changes/proposal-0004.md`](Document/changes/proposal-0004.md)。
-3. ~~细化 `apply_patch` 本地乐观更新语义~~：已完成，见 [`Document/changes/proposal-0005.md`](Document/changes/proposal-0005.md)。
-4. ~~统一共享代码目录~~：已完成，`SourceCode/backend/src/shared/` 已迁移到 `SourceCode/shared/` 作为 `@sldagent/shared` 包，重复副本已删除。
-5. ~~完善 Electron 本地文件 IO~~：已完成，主进程已增加 `dialog.showOpenDialog` / `showSaveDialog` IPC 处理（`dialog:openAndRead` / `dialog:saveAndWrite`），并补充了对应集成测试。
 
 ## 代码引用规范
 
