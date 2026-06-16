@@ -1,0 +1,40 @@
+{
+  "version": "1.0.0",
+  "description": "通用样式知识。包含 LLM 需要理解的样式模式、约束与修改规则。字段详细定义见 ../registry/field-registry.json。",
+  "styleCatalog": [
+    {
+      "style_type": "simple",
+      "geometry_types": ["point", "line", "polygon"],
+      "description": "单一符号样式，为所有匹配数据使用相同样式。"
+    },
+    {
+      "style_type": "categorized",
+      "geometry_types": ["point", "line", "polygon"],
+      "description": "按字段唯一值分类，例如 facility_type = 'school' / 'hospital'。"
+    },
+    {
+      "style_type": "classified",
+      "geometry_types": ["point", "line", "polygon"],
+      "description": "按字段数值分级，例如 population 分 5 级。"
+    },
+    {
+      "style_type": "text",
+      "geometry_types": ["point", "line", "polygon"],
+      "description": "文本标注样式，通常与点/线/面符号叠加使用。"
+    }
+  ],
+  "constraints": [
+    "输出必须是合法 JSON，不要添加 registry 之外的字段。",
+    "一个 Rule 必须至少包含一个 Symbolizer。",
+    "同一 FeatureTypeStyle 内只能有一个 Rule 开启 elseFilter。",
+    "如果开启 elseFilter，必须忽略该 Rule 的 filter 内容。",
+    "MinScaleDenominator 必须小于 MaxScaleDenominator。",
+    "文本标注应避免与背景符号颜色相同，防止无法辨识。"
+  ],
+  "modificationRules": [
+    "保留用户未提及的字段，不要擅自删除。",
+    "修改颜色时保持其他视觉参数不变。",
+    "添加新 Rule 时放在合适的 FeatureTypeStyle 内，考虑绘制顺序。"
+  ],
+  "fewShotExamples": []
+}

@@ -1,0 +1,27 @@
+{
+  "version": "1.0.0",
+  "description": "SLD 树中非 Symbolizer 节点的字段组合定义。前端根据 nodeType 查找对应 schema 渲染属性面板；分组由字段自身或 symbolizer schema 提供。",
+  "nodes": {
+    "UserStyle": {
+      "nodeType": "UserStyle",
+      "label": "用户样式",
+      "fields": ["name", "title", "abstract", "isDefault"]
+    },
+    "FeatureTypeStyle": {
+      "nodeType": "FeatureTypeStyle",
+      "label": "绘制顺序组",
+      "fields": ["title", "abstract", "featureTypeName"]
+    },
+    "Rule": {
+      "nodeType": "Rule",
+      "label": "规则",
+      "fields": ["name", "title", "abstract", "elseFilter", "scaleDenominator", "filter"],
+      "groups": [
+        { "id": "basic", "label": "基本信息", "fields": ["name", "title", "abstract"] },
+        { "id": "type", "label": "规则类型", "fields": ["elseFilter"] },
+        { "id": "scale", "label": "比例尺", "fields": ["scaleDenominator"] },
+        { "id": "filter", "label": "筛选条件", "fields": ["filter"] }
+      ]
+    }
+  }
+}

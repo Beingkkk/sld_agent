@@ -2,186 +2,267 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## 项目概览
+---
 
-**SLDAgent** 将自然语言地图样式请求转换为 OGC SLD 1.0.0 XML。
+# SLDAgent 项目指南
 
-核心流水线：
+SLDAgent 是一个基于 **Electron + Vue 3 + Node.js/TypeScript** 的桌面端 SLD（Styled Layer Descriptor）智能样式编辑器。项目目标是通过可视化树形编辑、实时预览和 AI 辅助，降低手写 SLD XML 的门槛。
 
+> **当前状态**：项目处于全新启动后的设计落地阶段。`Document/` 下已锁定 constitution、spec、plan-core、plan-frontend、plan-backend、plan-electron、plan-monorepo、plan-knowledge、**plan-filter**；`SourceCode/data/` 已放置 JSON 注册表、知识库、预转换的 Sample GeoJSON 与本地字体；`SourceCode/` 下的 frontend/backend/core/electron 代码**尚未实现**，暂无实际可运行的构建、测试或启动命令。
+
+---
+
+## 1. 核心设计文档（优先阅读）
+
+在修改任何代码前，应先阅读以下文档：
+
+| 文档 | 路径 | 内容 |
+| --- | --- | --- |
+| 宪法 | [`Document/constitution.md`](Document/constitution.md) | 技术栈约束、红色条款、质量门禁、文档效力层级 |
+| 产品规格 | [`Document/spec.md`](Document/spec.md) | MVP MoSCoW、验收场景、数据模型、关键术语 |
+| 架构与需求设计书 | [`Document/Research/调研方案.md`](Document/Research/调研方案.md) | 项目背景、核心需求、顶层架构、Roadmap |
+| 树结构与 SLD 映射 | [`Document/Research/调研设计.md`](Document/Research/调研设计.md) | 完整 SLD 树层级、TypeScript 类型、比例尺与 ElseFilter 交互 |
+| GeoStyler 复用报告 | [`Document/Research/GeoStyler复用报告.md`](Document/Research/GeoStyler复用报告.md) | GeoStyler 生态、依赖清单、集成方案、风险 |
+| UX 设计规范 | [`Document/UX/design.md`](Document/UX/design.md) | 视觉系统、布局规范、组件状态、交互说明、本地字体决策 |
+| 可交互原型 | [`Document/UX/prototype.html`](Document/UX/prototype.html) | 可直接用浏览器打开查看的 HTML 原型 |
+
+模块设计 plan：
+
+| Plan | 路径 | 内容 |
+| --- | --- | --- |
+| Core | [`Document/plan-core.md`](Document/plan-core.md) | SLD 树、Transformer、ValidationEngine、Symbolizer 映射层 |
+| Frontend | [`Document/plan-frontend.md`](Document/plan-frontend.md) | Vue 三栏 UI、JSON 驱动属性面板、OpenLayers 预览 |
+| Backend | [`Document/plan-backend.md`](Document/plan-backend.md) | Node/TS Agent、LLM、StyleBuilder、RuleGenerator |
+| Filter | [`Document/plan-filter.md`](Document/plan-filter.md) | 节点树 Filter 编辑器、CQL 预览 |
+| Electron | [`Document/plan-electron.md`](Document/plan-electron.md) | 无边框窗口、自定义标题栏、IPC、生产期资源路径 |
+| Monorepo | [`Document/plan-monorepo.md`](Document/plan-monorepo.md) | 目录结构、workspace、依赖治理、构建脚本 |
+| Knowledge | [`Document/plan-knowledge.md`](Document/plan-knowledge.md) | JSON 注册表、知识库、LLM 输入治理 |
+
+---
+
+## 2. 顶层架构
+
+项目采用 **monorepo + 前后端分离 + 单向数据流 + AI 解释层** 的架构。
+
+```text
+┌─────────────────────────────────────────────────────────────┐
+│                    Electron + Vue 3 前端                     │
+│  ┌──────────────┐  ┌──────────────────────┐  ┌──────────┐  │
+│  │   SLD 树编辑  │  │   属性面板 + 地图预览 │  │ 代码 + AI │  │
+│  └──────┬───────┘  └──────┬───────┘  └────────┬─────────┘  │
+│         │                 │                   │            │
+│         └─────────────────┼───────────────────┘            │
+│                           │                                 │
+│              SourceCode/data/registry/*.json                │
+│              （字段定义 / Symbolizer schema / 编辑器类型）    │
+└───────────────────────────┬─────────────────────────────────┘
+                            │ WebSocket
+┌───────────────────────────┼─────────────────────────────────┐
+│              Node.js / TypeScript Agent 后端                 │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐  │
+│  │  LLM 语义解析  │  │ StyleBuilder │  │ geostyler-sld-   │  │
+│  │  知识库注入    │  │ RuleGenerator│  │ parser write/read│  │
+│  └──────────────┘  └──────────────┘  └──────────────────┘  │
+│  ┌──────────────────────────────────────┐                  │
+│  │ SourceCode/data/knowledge/*.json       │                  │
+│  │ （SLD 速查 / 约束 / Few-shot 样例）     │                  │
+│  └──────────────────────────────────────┘                  │
+└─────────────────────────────────────────────────────────────┘
 ```
-自然语言指令
-        ↓
-LLM 语义解析（受 JSON Schema 约束）
-        ↓
-StyleParams
-        ↓
-ParamsNormalizer（LLM 别名映射）
-        ↓
-StyleBuilder
-        ↓
-GeoStyler Style
-        ↓
-geostyler-sld-parser
-        ↓
-SLD 1.0.0 XML
-        ↓
-OGC XSD 校验（xmllint / xmllint-wasm）+ Parser Roundtrip 校验
-```
 
-项目遵循 **SDD（规范驱动开发）**：`Document/` 下的需求与设计文档是编写 `Document/spec.md` 和 `Document/plan-{module}.md` 的前置输入，代码实现必须能追溯到对应 plan 的接口定义章节。变更必须走 `Document/changes/proposal-*.md`，禁止直接修改已锁定的 spec 或 plan。
+### 核心数据流
 
-## 当前阶段
+1. 前端树编辑器维护**唯一的 Store**（以 GeoStyler Style 为中间模型）。
+2. 用户操作更新 Store 后，同步触发：
+   - 属性面板从 `SourceCode/data/registry/*.json` 动态渲染；
+   - 预览地图通过 `geostyler-openlayers-parser` 渲染；
+   - 右侧代码区显示 GeoStyler JSON 与 SLD XML。
+3. AI 功能由后端调用 LLM，前端只负责展示解释文本与预警。
 
-MVP 核心模块已实现，后端 63 个测试、前端 67 个测试全部通过，工作区已清理。当前代码位于 `feature/post-mvp-cleanup` 分支，尚未合并到 `main`。
+---
 
-- **SDD 文档**：`Document/constitution.md`、`spec.md`、5 个 `plan-{module}.md`、`design/` 已冻结或按 proposal 流程更新。
-- **后端**：`SourceCode/backend/` 已实现 WebSocket 服务、AgentSession、StyleBuilder、SldService、KnowledgeBaseLoader、PromptBuilder、LlmClient。
-- **前端**：`SourceCode/frontend/` 已实现 Vue 3 + Electron 骨架、Pinia Store、WebSocket 客户端、MapPreview、Inspector、Assistant、Toolbar、StatusBar 及参数/规则/Filter 编辑组件。
-- **共享包**：`SourceCode/shared/` 已抽离为 `@sldagent/shared`，前后端通过统一包引用，不再维护后端内部副本。
-
-## 高层架构
-
-理解整体架构需要同时阅读以下文档：
-
-- [`Document/design/architecture.html`](Document/design/architecture.html) — 模块划分、核心类图、关键场景时序图。
-- [`Document/design/interface-contracts.md`](Document/design/interface-contracts.md) — WebSocket 消息契约、`apply_patch` 批量 patches、请求/响应信封、错误码、超时约定、Electron 启动生命周期。
-- [`Document/design/agent-session.md`](Document/design/agent-session.md) — 后端会话状态（`currentStyle`、`lastValidStyle`）、知识库加载、多轮 `modify` 协议、回退机制、并发控制。
-- [`Document/design/style-builder.md`](Document/design/style-builder.md) — `StyleParams` 结构、LLM 字段别名归一化 `ParamsNormalizer`、Builder 工厂、GeoStyler 映射、知识库默认值。
-- [`Document/design/sld-service.md`](Document/design/sld-service.md) — SLD 读/写封装、系统 `xmllint` 与 `xmllint-wasm` XSD 校验、Parser Roundtrip 校验。
-- [`Document/design/filter-editor.md`](Document/design/filter-editor.md) — GeoStyler Filter 数组 ↔ UI 树模型 ↔ 只读 CQL 预览。
-- [`Document/design/xmllint-packaging.md`](Document/design/xmllint-packaging.md) — `xmllint` 平台可用性、`xmllint-wasm` 打包方案、schema bundle 下载脚本、降级策略。
-- [`Document/design/README.md`](Document/design/README.md) — 设计文档索引与决策速查。
-
-关键架构决策：
-
-1. **后端是权威状态源**：`AgentSession` 持有 `currentStyle` 与 `lastValidStyle`；前端通过 `apply_patch` 提交 UI 修改。
-2. **失败即回退**：`generate` / `modify` / `apply_patch` 任一阶段失败都回退到 `lastValidStyle`；不维护多轮参数历史快照。
-3. **参数化精修是精确编辑主路径**：用户通过前端参数面板、规则列表、Filter 编辑器直接修改 GeoStyler 模型，经 `apply_patch` 批量提交 patches；自然语言 `modify` 负责语义级风格调整。MVP 采用“确认后提交”模式，非即时逐字段提交。
-4. **Schema 是唯一契约**：LLM 输出 → `StyleParamsValidator` → `ParamsNormalizer` → `StyleBuilder` → `SldService` 都围绕同一 `StyleParams` 类型。
-5. **知识库驱动默认值与 Prompt**：启动时加载 `knowledge/root.json` + 领域文件（`default.json`、`transport.json`、`landuse.json`）；对象字段业务领域覆盖 `default`，数组字段业务领域前置，同时仅激活一个业务领域。
-6. **Filter 中间表示**：后端/UI 模型使用 GeoStyler Filter 数组；UI 使用 `FilterNode` 树；CQL 用于只读预览。
-7. **XSD 校验策略**：开发期使用系统 `xmllint`；生产打包使用 `xmllint-wasm` + 本地 OGC schema bundle；缺失时降级为 Parser Roundtrip + XML 语法校验。
-8. **Electron/WebSocket 启动模式**：Electron 主进程启动 Node 后端，解析 stdout 中的 `READY ws://localhost:{port}` 后再加载渲染页；渲染进程通过原生 `WebSocket` 直连后端，不经过 IPC 转发。
-
-## 工具使用偏好
-
-本项目配置了 CodeGraph MCP server。优先使用 `codegraph_*` 工具回答结构性问题（符号定义、调用关系、影响范围、调用路径），避免对相同代码重复启动文件搜索 agent 或 grep 循环。
-
-- 查找符号定义 / 调用方 / 被调用方 → `codegraph_search` / `codegraph_callers` / `codegraph_callees`
-- 理解某功能区域 → `codegraph_context`
-- 追踪调用流 / X 如何到达 Y → `codegraph_trace`
-- 批量查看相关符号源码 → `codegraph_explore`
-
-若 `.codegraph/` 索引过期或缺失，运行 `npx codegraph init -i` 重建。
-
-## 技术栈
-
-| 层级 | 技术 |
-|---|---|
-| 后端 | Node.js 20.6+、TypeScript 5.x、`geostyler-sld-parser`、`geostyler-style`、`chroma-js`、`ajv`、`ws`、`commander` |
-| LLM | Anthropic / OpenAI Node SDK；配置位于 `SourceCode/config/config.json`（本地文件，不提交） |
-| 前端 | Vue 3、Electron、`geostyler-openlayers-parser`、`geostyler-sld-parser`、`OpenLayers`、`Pinia` |
-| 通信 | WebSocket（渲染进程直接连接；Electron 主进程仅管理后端生命周期） |
-| 校验 | `ajv`（JSON Schema）+ 系统 `xmllint` / `xmllint-wasm`（OGC XSD） |
-| 测试 | `vitest` |
-| 代码质量 | `eslint`、`typescript` |
-
-## 常用命令
-
-### 后端
-
-```bash
-cd SourceCode/backend
-npm install              # 会同步链接 ../shared 到 node_modules/@sldagent/shared
-npm run dev              # tsx 开发启动（输出 READY ws://localhost:{port}）
-npm run start            # 运行 dist/index.js（需先 build）
-npm run build            # 编译到 dist/（含共享包 build:shared）
-npm run test             # 先 build:shared，再运行 vitest 全部测试（含 tests/e2e）
-npx vitest run tests/unit/AgentSession.test.ts   # 单个测试文件
-npx vitest run tests/e2e/integration.test.ts     # 仅运行 e2e 流水线测试
-npm run typecheck        # build:shared + tsc --noEmit
-npm run lint             # eslint（当前缺少 ESLint 配置，会失败）
-```
+## 3. 技术栈
 
 ### 前端
+- **框架**：Vue 3 + TypeScript
+- **状态管理**：Pinia
+- **样式**：Tailwind CSS
+- **地图渲染**：OpenLayers + `geostyler-openlayers-parser@^5.7.0`
+- **SLD 解析**：`geostyler-sld-parser@^9.0.1`
+- **类型定义**：`geostyler-style@^12.0.0`
+- **代码高亮**：`highlight.js`
+- **图标**：Phosphor Icons（推荐 `@phosphor-icons/vue`）
+
+### 后端
+- **运行时**：Node.js >= 20.6.0
+- **语言**：TypeScript
+- **SLD 生成**：`geostyler-sld-parser@^9.0.1`
+- **分类/分级配色**：`chroma-js`
+- **JSON Schema 校验**：`ajv`
+- **LLM Provider**：Anthropic 兼容接口（配置读取自 `config.json`，API Key 通过环境变量 `SLDAGENT_LLM_API_KEY` 注入）
+
+### 桌面封装
+- **Electron**：Vue 前端作为 renderer，Node/TS 后端以子进程形式运行
+- **通信方式**：开发与生产均使用 WebSocket；IPC 仅用于窗口控制与文件对话框
+
+---
+
+## 4. 代码组织
+
+`SourceCode/` 采用 npm workspaces monorepo 结构：
+
+```text
+SourceCode/
+├── core/                  # @sldagent/core：SLD 树、Transformer、ValidationEngine
+├── frontend/              # @sldagent/frontend：Vue 3 前端
+├── backend/               # @sldagent/backend：Node/TS Agent 后端
+├── electron/              # @sldagent/electron：主进程、preload、打包
+├── data/                  # 外置 JSON 资源（registry + knowledge + sample + fonts）
+└── config/                # 配置文件模板（config.json.template）
+```
+
+外置资源：
+
+```text
+SourceCode/data/
+├── registry/
+│   ├── editor-types.json
+│   ├── field-registry.json
+│   ├── node-schemas.json
+│   └── symbolizer-schemas.json
+├── knowledge/
+│   ├── root.json
+│   ├── default.json
+│   ├── sld-reference.json
+│   └── examples.json
+├── sample/                # Sample GeoJSON（由 shapefile 预转换）/ shapefile 源 / raster
+└── fonts/                 # 本地字体：Space Grotesk / IBM Plex Sans / JetBrains Mono
+```
+
+---
+
+## 5. 常用命令
+
+> 当前项目尚未初始化 `package.json`、构建脚本与测试框架，以下命令来自 [`Document/plan-monorepo.md`](Document/plan-monorepo.md)，待 monorepo 骨架搭建后启用。
 
 ```bash
-cd SourceCode/frontend
+# 安装所有 workspace 依赖
 npm install
-npm run dev              # Vite 开发服务器
-npm run build            # vue-tsc + vite build
-npm run test             # vitest（含 tests/unit、src/**/*.test.ts、electron/**/*.test.ts）
-npx vitest run src/components/SymbolizerEditor.test.ts   # 单个组件测试
-npx vitest run electron/main.test.ts                     # Electron 主进程测试
-npm run typecheck        # vue-tsc --noEmit
-npm run lint             # eslint src electron（当前缺少 ESLint 配置，会失败）
-npm run electron:dev     # Electron 开发模式（需同时运行 npm run dev 提供 5173）
-npm run electron:build   # Electron 打包
+
+# 开发模式同时启动 frontend + backend
+npm run dev
+
+# 独立启动前端（Vite dev server）
+npm run dev:frontend
+
+# 独立启动后端（Node/TS WebSocket Agent）
+npm run dev:backend
+
+# 构建所有 workspace
+npm run build
+
+# 运行所有 workspace 测试
+npm test
+
+# 类型检查
+npm run typecheck
+
+# 代码检查
+npm run lint
+
+# 打包 Electron 应用
+npm run dist
 ```
 
-### 端到端开发流程
-
-1. 复制 `SourceCode/config/config.example.json` 到 `SourceCode/config/config.json` 并填写 LLM 端点与 API Key。
-2. 启动后端：`cd SourceCode/backend && npm run dev`，记录输出的端口。
-3. 浏览器模式：`cd SourceCode/frontend && npm run dev`，访问 `http://localhost:5173/?port={后端端口}`。
-4. Electron 模式：终端 A 运行 `npm run dev`；终端 B 运行 `npm run electron:dev`，Electron 主进程会自动拉起后端。
-
-### Spikes
-
-`spike/` 目录未进入版本控制。已完成的 spike 可直接本地运行，例如：
+单测试命令待具体测试框架（如 vitest）初始化后补充，通常为：
 
 ```bash
-cd spike/parser-e2e && npm install && npm test
-cd spike/xmllint-wasm-bundle && npm install && npm run download && npm test
-cd spike/openlayers-preview && npm install && npm test
+npm test -- --run src/path/to/test.spec.ts
 ```
 
-## 共享代码与路径别名
+---
 
-- **SourceCode/shared/**：前后端共享的类型定义、`WsMessage` 契约、`FilterNode` 适配器、CQL 转换以及 `applyPatches` patch 工具。
-  - 前端通过 `@shared` 别名引用（`vite.config.ts` 中配置为 `../shared`）。
-  - 后端通过 npm `file:../shared` 依赖以 `@sldagent/shared` 包形式引用。
-  - 变更共享包后，后端 `npm run test` / `npm run typecheck` 会自动重新编译；前端 `vite` 开发模式直接读取源码，无需手动构建。
-- **前端内部**：`@/` 别名指向 `SourceCode/frontend/src/`。
+## 6. 关键决策记录
 
-## 已验证的关键约束
+### 6.1 为什么用 GeoStyler 但不直接用 GeoStyler React UI？
 
-以下约束已在 Spike 中验证，并反向同步到设计文档，编码时应直接遵循：
+GeoStyler 主包是 React + Ant Design，而 SLDAgent 前端是 Vue 3。复用报告结论：只复用 parser 与数据模型，UI 组件参考其设计后自行实现。
 
-1. **`elseFilter` 无法 roundtrip** — `geostyler-sld-parser@9.0.1` 会丢弃 `Rule.elseFilter`，分类默认规则必须使用显式 Filter。见 [`Document/design/style-builder.md`](Document/design/style-builder.md) §6.2。
-2. **symbolizer 内 `<Geometry>` 会导致 `readStyle` 崩溃** — 导入含显式 `<Geometry>` 的 SLD 前需剥离。见 [`Document/design/sld-service.md`](Document/design/sld-service.md) §5。
-3. **`xmllint-wasm` 需要完整 OGC schema bundle** — 必须 preload `xlink.xsd`、`xml.xsd`、`filter.xsd`、`expr.xsd`、`geometry.xsd`、`gml.xsd`、`feature.xsd`。见 [`Document/design/xmllint-packaging.md`](Document/design/xmllint-packaging.md) §4.2。
-4. **LLM 会发明语义别名** — 如文本样式中可能输出 `font_color`，需经 `ParamsNormalizer` 映射为 `stroke_color`。见 [`Document/design/style-builder.md`](Document/design/style-builder.md) §4。
-5. **知识库合并规则** — `default.json` 始终加载；对象字段由业务领域覆盖，数组字段（`few_shot_examples`、`modification_rules`、`constraints`）由业务领域前置。见 [`Document/design/style-builder.md`](Document/design/style-builder.md) §8.1。
-6. **渲染进程直接通过 WebSocket 通信** — Electron 主进程只负责启动/停止 Node 后端并通过 URL 查询参数传递端口。见 [`Document/design/interface-contracts.md`](Document/design/interface-contracts.md) §9。
-7. **OpenLayers 预览与 GeoServer 效果存在差异** — 渐变、图案填充、图案线型不支持或仅部分支持，需在 UI 中提示。见 [`spike/openlayers-preview/result.md`](spike/openlayers-preview/result.md)。
+### 6.2 为什么后端用 Node.js/TypeScript？
 
-## 本地资源与忽略文件
+`geostyler-sld-parser` 是 Node 包。直接用 Node/TS 调用 parser 可以避免 Python 与 Node 之间的子进程桥接，保证前后端对 SLD 的理解一致。
 
-- **LLM 连接配置**：`SourceCode/config/config.json`（本地文件，不提交，已由 `.gitignore` 排除）。已跟踪的模板见 `SourceCode/config/config.example.json`。
-- **XSD 与参考文档**：`Document/Research/`（本地目录，不提交）。开发中若需要 SLD 1.0.0 XSD，可从 `spike/parser-e2e/schemas-local/` 或 `spike/xmllint-wasm-bundle/` 获取。
-- **Schema bundle 下载脚本原型**：[`spike/xmllint-wasm-bundle/scripts/download-sld-schemas.js`](spike/xmllint-wasm-bundle/scripts/download-sld-schemas.js)
-- **UX 交互原型**：[`Document/UX/index.html`](Document/UX/index.html)
-- **CodeGraph 索引数据**：`.codegraph/`（本地数据，不提交）。
-- **Spike 目录**：`spike/`（本地验证目录，不进入版本控制）。
+### 6.3 数据模型以什么为基准？
 
-## 关键约束
+以 **GeoStyler Style** 为中间模型。前端 Store、后端 Builder、LLM 输出 Schema 都围绕 GeoStyler Style 字段设计，最终通过 `geostyler-sld-parser.writeStyle()` 输出 SLD XML。
 
-- SLD 版本锁定为 **1.0.0**，以保证 GeoServer 兼容。
-- JSON 知识库在启动时加载，不支持运行时热重载。
-- 同一时刻只激活一个业务领域（`default` 加一个可选专业领域，如 `transport`、`landuse`）。
-- 不维护参数变更历史；多轮编辑只保留当前 GeoStyler Style 与聊天文本。
-- **不使用 RAG**；知识以预结构化 JSON 形式注入 LLM 上下文。
-- **GeoStyler 是 SLD 解析与生成的唯一真相源**；前后端使用同一版本 `geostyler-sld-parser`。
-- SLD XML 对用户是只读产物，不开放直接编辑；用户编辑对象是 GeoStyler Style 中间表示。
+### 6.4 项目为什么用 monorepo？
 
-## 代码引用规范
+`geostyler-sld-parser` 等关键依赖必须前后端版本一致。monorepo + root lock 文件可以统一管理版本；`@sldagent/core` 被 frontend/backend 共享，避免代码复制。
 
-在对话中引用文件或代码位置时，请使用 markdown 链接语法，以便在 IDE 中可点击：
+### 6.5 为什么属性面板要 JSON 驱动？
 
-- 文件：[`style-builder.md`](Document/design/style-builder.md)
-- 指定行：[`style-builder.md:42`](Document/design/style-builder.md#L42)
-- 行范围：[`style-builder.md:42-51`](Document/design/style-builder.md#L42-L51)
-- 文件夹：[`Document/design/`](Document/design/)
+`SourceCode/data/registry/field-registry.json` 同时服务前端渲染与 LLM 知识注入。新增 Symbolizer 字段或类型时，只需改 JSON，无需新增 Vue 表单组件。
 
-路径均相对于仓库根目录。
+### 6.6 为什么 Electron 用无边框窗口？
+
+为了严格对齐 [`Document/UX/design.md`](Document/UX/design.md) 的暗色制图工作台风格。标题栏由前端 `AppTitleBar.vue` 自定义实现，窗口控制通过 IPC 调用主进程。
+
+### 6.7 为什么开发与生产都用 WebSocket？
+
+前后端通信协议保持一致，避免双路径代码；IPC 仅用于 Electron 原生能力（窗口控制、文件对话框）。
+
+### 6.8 全新启动阶段补充决策
+
+- **Symbolizer kind 命名**：采用 GeoStyler 原生命名 `Mark` / `Line` / `Fill` / `Text`，UI 通过 `symbolizer-schemas.json` 的 `userLabel` 展示中文；树 → GeoStyler 之间由 Core `SymbolizerTransformer` 显式映射。
+- **树节点标签**：仅显示完整 XML 标签名（如 `sld:NamedLayer`、`sld:PointSymbolizer`），不显示 kind 或中文语义。
+- **NamedLayer / UserStyle 数量**：MVP 仅允许各一个；导入多容器 SLD 时保留第一个并给出 warning。
+- **Filter 编辑器**：采用节点树形式（AND / OR / NOT / 比较条件），`propertyName` 用文本输入，CQL 仅作只读预览。
+- **字体加载**：本地 TTF 文件，保证离线优先；文件位于 `SourceCode/frontend/public/fonts/`。
+- **Sample 数据**：shapefile 源数据保留在 `SourceCode/data/sample/`，运行时统一读取预转换后的 GeoJSON。
+- **属性面板分组**：Symbolizer 按 `symbolizer-schemas.json` 的 `groups` 分组折叠；Rule 按 `node-schemas.json` 的 `groups` 分组；UserStyle / FeatureTypeStyle 保持扁平。
+
+---
+
+## 7. SDD 工作流纪律
+
+本项目使用 **SDD（Specification-Driven Development）** 规范驱动开发。编码前必须遵守：
+
+- 禁止无 plan 直接编码。
+- 禁止直接修改已锁定的 spec 或 plan。
+- 所有变更必须先创建 `Document/changes/proposal-{NNNN}.md`，审阅通过后再实现。
+- 公共接口必须在对应 plan 的「接口定义」章节中描述。
+- 新增代码必须伴随测试。
+- 需求变更必须同步更新 spec。
+
+常用 SDD 命令/操作：
+
+```bash
+# 创建变更提案
+# /sdd-propose --type {A|B|C|D}
+
+# 一致性验证
+# /sdd-verify
+```
+
+---
+
+## 8. 开发注意事项
+
+- 不要在源码中硬编码 API Key、LLM endpoint 等敏感信息，应通过 `SourceCode/config/config.json` 或环境变量注入；`config.json` 不提交仓库，仅保留 `config.json.template`。
+- 不要手写 SLD XML 构造器，所有 SLD 生成必须经过 `geostyler-sld-parser`。
+- 前后端应使用同一版本的 `geostyler-sld-parser`，由 root `package-lock.json` 统一管理。
+- 预览区使用内置 Sample GeoJSON 作为 MVP 数据，后续再支持用户上传。
+- FeatureTypeStyle 的 `title` / `abstract` / `featureTypeName` 当前不被 GeoStyler JSON 直接支持，生成 SLD 时需要额外保留。
+- 属性面板字段定义在 `SourceCode/data/registry/field-registry.json`；修改字段元数据时，需同步检查前端编辑器组件、Core `SymbolizerTransformer` 映射与 LLM prompt 是否兼容。
+- Filter 节点树存储在 Rule 节点中，由 Core `FilterTransformer` 与 GeoStyler Filter 数组双向转换。
+
+---
+
+## 9. 相关外部资源
+
+- GeoStyler 官方文档：https://geostyler.github.io/geostyler/latest/index.html
+- GeoStyler Style 类型文档：https://geostyler.github.io/geostyler-style/docs/master/
+- OGC SLD 1.0.0 Schema：[`Document/Research/sld/1.0.0/StyledLayerDescriptor.xsd`](Document/Research/sld/1.0.0/StyledLayerDescriptor.xsd)
+- SLD 1.0.0 样例：[`Document/Research/sld/1.0.0/example-sld.xml`](Document/Research/sld/1.0.0/example-sld.xml)
+- GeoStyler 源码参考：[`Document/Research/geostyler-main/`](Document/Research/geostyler-main/)

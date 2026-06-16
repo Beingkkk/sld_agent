@@ -1,0 +1,389 @@
+{
+  "version": "1.0.0",
+  "description": "所有可编辑字段的元数据注册表。树节点字段 ID 采用语义化命名；Core SymbolizerTransformer 按 Symbolizer kind 将其映射到 GeoStyler 扁平字段。前端用它渲染属性面板，后端 LLM 用它理解字段含义。",
+  "fields": {
+    "name": {
+      "id": "name",
+      "label": "名称",
+      "description": "节点内部名称，用于 XML 内部引用。",
+      "editor": "string",
+      "required": true,
+      "default": ""
+    },
+    "title": {
+      "id": "title",
+      "label": "标题",
+      "description": "可读性标题，展示在图层列表等位置。",
+      "editor": "string",
+      "required": false,
+      "default": ""
+    },
+    "abstract": {
+      "id": "abstract",
+      "label": "描述",
+      "description": "节点的描述信息，便于团队协作。",
+      "editor": "textarea",
+      "required": false,
+      "default": ""
+    },
+    "isDefault": {
+      "id": "isDefault",
+      "label": "默认样式",
+      "description": "是否作为图层的默认样式。",
+      "editor": "boolean",
+      "required": false,
+      "default": false
+    },
+    "featureTypeName": {
+      "id": "featureTypeName",
+      "label": "目标要素类型",
+      "description": "指定该 FeatureTypeStyle 只作用于特定要素类型，通常可留空。",
+      "editor": "string",
+      "required": false,
+      "default": ""
+    },
+    "elseFilter": {
+      "id": "elseFilter",
+      "label": "兜底规则",
+      "description": "开启后，当同一 FeatureTypeStyle 中前面所有规则都不匹配时生效。开启后 Filter 设置将被忽略。",
+      "editor": "boolean",
+      "required": true,
+      "default": false
+    },
+    "filter": {
+      "id": "filter",
+      "label": "Filter",
+      "description": "可视化条件树，用于匹配满足条件的数据。",
+      "editor": "filter-tree",
+      "required": false,
+      "default": null
+    },
+    "scaleDenominator": {
+      "id": "scaleDenominator",
+      "label": "比例尺范围",
+      "description": "规则生效的最小/最大比例尺。最小比例尺对应最大放大程度。",
+      "editor": "scale-range",
+      "required": false,
+      "default": { "min": null, "max": null },
+      "geoStylerPath": "scaleDenominator"
+    },
+
+    "markWellKnownName": {
+      "id": "markWellKnownName",
+      "label": "形状",
+      "description": "点标记的形状。",
+      "editor": "enum",
+      "required": true,
+      "default": "circle",
+      "options": ["circle", "square", "triangle", "star", "cross", "x"],
+      "geoStylerPath": "wellKnownName",
+      "sldElement": "WellKnownName"
+    },
+    "markRadius": {
+      "id": "markRadius",
+      "label": "大小",
+      "description": "点标记的半径，单位像素。",
+      "editor": "number",
+      "required": false,
+      "default": 12,
+      "editorProps": { "min": 0, "step": 1 },
+      "geoStylerPath": "radius",
+      "sldCssParameter": "size"
+    },
+    "markFillColor": {
+      "id": "markFillColor",
+      "label": "填充颜色",
+      "description": "点标记填充颜色。",
+      "editor": "color",
+      "required": false,
+      "default": "#FF0000",
+      "geoStylerPath": "color",
+      "sldCssParameter": "fill"
+    },
+    "markFillOpacity": {
+      "id": "markFillOpacity",
+      "label": "填充不透明度",
+      "description": "填充颜色的不透明度，0 为完全透明，1 为不透明。",
+      "editor": "opacity",
+      "required": false,
+      "default": 1,
+      "geoStylerPath": "fillOpacity",
+      "sldCssParameter": "fill-opacity"
+    },
+    "markStrokeColor": {
+      "id": "markStrokeColor",
+      "label": "描边颜色",
+      "description": "点标记描边颜色。",
+      "editor": "color",
+      "required": false,
+      "default": "#000000",
+      "geoStylerPath": "strokeColor",
+      "sldCssParameter": "stroke"
+    },
+    "markStrokeWidth": {
+      "id": "markStrokeWidth",
+      "label": "描边宽度",
+      "description": "点标记描边宽度，单位像素。",
+      "editor": "number",
+      "required": false,
+      "default": 0,
+      "editorProps": { "min": 0, "step": 0.5 },
+      "geoStylerPath": "strokeWidth",
+      "sldCssParameter": "stroke-width"
+    },
+    "markStrokeOpacity": {
+      "id": "markStrokeOpacity",
+      "label": "描边不透明度",
+      "description": "描边颜色的不透明度。",
+      "editor": "opacity",
+      "required": false,
+      "default": 1,
+      "geoStylerPath": "strokeOpacity",
+      "sldCssParameter": "stroke-opacity"
+    },
+    "markRotate": {
+      "id": "markRotate",
+      "label": "旋转角度",
+      "description": "点标记的旋转角度，单位度。",
+      "editor": "number",
+      "required": false,
+      "default": 0,
+      "editorProps": { "step": 1 },
+      "geoStylerPath": "rotate",
+      "sldCssParameter": "rotation"
+    },
+
+    "lineColor": {
+      "id": "lineColor",
+      "label": "颜色",
+      "description": "线的颜色。",
+      "editor": "color",
+      "required": false,
+      "default": "#FF0000",
+      "geoStylerPath": "color",
+      "sldCssParameter": "stroke"
+    },
+    "lineWidth": {
+      "id": "lineWidth",
+      "label": "宽度",
+      "description": "线的宽度，单位像素。",
+      "editor": "number",
+      "required": false,
+      "default": 4,
+      "editorProps": { "min": 0, "step": 0.5 },
+      "geoStylerPath": "width",
+      "sldCssParameter": "stroke-width"
+    },
+    "lineOpacity": {
+      "id": "lineOpacity",
+      "label": "不透明度",
+      "description": "线颜色的不透明度。",
+      "editor": "opacity",
+      "required": false,
+      "default": 1,
+      "geoStylerPath": "opacity",
+      "sldCssParameter": "stroke-opacity"
+    },
+    "lineDasharray": {
+      "id": "lineDasharray",
+      "label": "线型",
+      "description": "虚线模式，例如 [4, 2] 表示 4px 实线 + 2px 空白。空数组表示实线。",
+      "editor": "number-array",
+      "required": false,
+      "default": [],
+      "geoStylerPath": "dasharray",
+      "sldCssParameter": "stroke-dasharray"
+    },
+    "lineCap": {
+      "id": "lineCap",
+      "label": "线端样式",
+      "description": "线端帽样式。",
+      "editor": "enum",
+      "required": false,
+      "default": "round",
+      "options": ["butt", "round", "square"],
+      "geoStylerPath": "cap",
+      "sldCssParameter": "stroke-linecap"
+    },
+    "lineJoin": {
+      "id": "lineJoin",
+      "label": "连接样式",
+      "description": "线连接处样式。",
+      "editor": "enum",
+      "required": false,
+      "default": "round",
+      "options": ["bevel", "round", "miter"],
+      "geoStylerPath": "join",
+      "sldCssParameter": "stroke-linejoin"
+    },
+
+    "fillColor": {
+      "id": "fillColor",
+      "label": "填充颜色",
+      "description": "多边形填充颜色。",
+      "editor": "color",
+      "required": false,
+      "default": "#CCFFCC",
+      "geoStylerPath": "color",
+      "sldCssParameter": "fill"
+    },
+    "fillOpacity": {
+      "id": "fillOpacity",
+      "label": "填充不透明度",
+      "description": "填充颜色的不透明度。",
+      "editor": "opacity",
+      "required": false,
+      "default": 1,
+      "geoStylerPath": "fillOpacity",
+      "sldCssParameter": "fill-opacity"
+    },
+    "fillOutlineColor": {
+      "id": "fillOutlineColor",
+      "label": "描边颜色",
+      "description": "多边形描边颜色。",
+      "editor": "color",
+      "required": false,
+      "default": "#333333",
+      "geoStylerPath": "outlineColor",
+      "sldCssParameter": "stroke"
+    },
+    "fillOutlineWidth": {
+      "id": "fillOutlineWidth",
+      "label": "描边宽度",
+      "description": "多边形描边宽度，单位像素。",
+      "editor": "number",
+      "required": false,
+      "default": 1,
+      "editorProps": { "min": 0, "step": 0.5 },
+      "geoStylerPath": "outlineWidth",
+      "sldCssParameter": "stroke-width"
+    },
+    "fillOutlineOpacity": {
+      "id": "fillOutlineOpacity",
+      "label": "描边不透明度",
+      "description": "描边颜色的不透明度。",
+      "editor": "opacity",
+      "required": false,
+      "default": 1,
+      "geoStylerPath": "outlineOpacity",
+      "sldCssParameter": "stroke-opacity"
+    },
+    "fillOutlineDasharray": {
+      "id": "fillOutlineDasharray",
+      "label": "描边线型",
+      "description": "描边虚线模式，空数组表示实线。",
+      "editor": "number-array",
+      "required": false,
+      "default": [],
+      "geoStylerPath": "outlineDasharray",
+      "sldCssParameter": "stroke-dasharray"
+    },
+
+    "textLabel": {
+      "id": "textLabel",
+      "label": "标注字段",
+      "description": "要显示为标注的属性字段名，例如 name。",
+      "editor": "string",
+      "required": false,
+      "default": "name",
+      "geoStylerPath": "label",
+      "sldElement": "Label/ogc:PropertyName"
+    },
+    "textFont": {
+      "id": "textFont",
+      "label": "字体",
+      "description": "标注字体族。GeoStyler 内部以字符串数组存储，MVP 仅取第一项。",
+      "editor": "font",
+      "required": false,
+      "default": "Arial",
+      "options": ["Arial", "Verdana", "Sans-serif", "Courier New", "Lucida Console", "Monospace", "Times New Roman", "Georgia", "Serif"],
+      "geoStylerPath": "font",
+      "sldCssParameter": "font-family"
+    },
+    "textSize": {
+      "id": "textSize",
+      "label": "字号",
+      "description": "标注字号，单位像素。",
+      "editor": "number",
+      "required": false,
+      "default": 12,
+      "editorProps": { "min": 0, "step": 1 },
+      "geoStylerPath": "size",
+      "sldCssParameter": "font-size"
+    },
+    "textColor": {
+      "id": "textColor",
+      "label": "颜色",
+      "description": "标注文字颜色。",
+      "editor": "color",
+      "required": false,
+      "default": "#000000",
+      "geoStylerPath": "color",
+      "sldCssParameter": "fill"
+    },
+    "textFontWeight": {
+      "id": "textFontWeight",
+      "label": "字重",
+      "description": "标注字重。",
+      "editor": "enum",
+      "required": false,
+      "default": "normal",
+      "options": ["normal", "bold"],
+      "geoStylerPath": "fontWeight",
+      "sldCssParameter": "font-weight"
+    },
+    "textFontStyle": {
+      "id": "textFontStyle",
+      "label": "字体样式",
+      "description": "标注字体样式。",
+      "editor": "enum",
+      "required": false,
+      "default": "normal",
+      "options": ["normal", "italic", "oblique"],
+      "geoStylerPath": "fontStyle",
+      "sldCssParameter": "font-style"
+    },
+    "textAnchor": {
+      "id": "textAnchor",
+      "label": "锚点",
+      "description": "标注相对于定位点的锚点位置。",
+      "editor": "enum",
+      "required": false,
+      "default": "center",
+      "options": ["center", "left", "right", "top", "bottom", "top-left", "top-right", "bottom-left", "bottom-right"],
+      "geoStylerPath": "anchor",
+      "sldElement": "AnchorPoint"
+    },
+    "textOffset": {
+      "id": "textOffset",
+      "label": "偏移",
+      "description": "标注在 X/Y 方向上的像素位移。",
+      "editor": "point2d",
+      "required": false,
+      "default": { "x": 0, "y": 0 },
+      "geoStylerPath": "offset",
+      "sldElement": "Displacement"
+    },
+    "textHaloColor": {
+      "id": "textHaloColor",
+      "label": "光晕颜色",
+      "description": "标注文字光晕颜色。",
+      "editor": "color",
+      "required": false,
+      "default": "#FFFFFF",
+      "geoStylerPath": "haloColor",
+      "sldCssParameter": "halo-color"
+    },
+    "textHaloWidth": {
+      "id": "textHaloWidth",
+      "label": "光晕宽度",
+      "description": "标注文字光晕宽度，单位像素。",
+      "editor": "number",
+      "required": false,
+      "default": 0,
+      "editorProps": { "min": 0, "step": 0.5 },
+      "geoStylerPath": "haloWidth",
+      "sldCssParameter": "halo-radius"
+    }
+  }
+}

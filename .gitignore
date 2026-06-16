@@ -1,37 +1,68 @@
-# Dependencies
-node_modules/
-
-# Build outputs
-dist/
-dist-electron/
-release/
-*.tsbuildinfo
-
-# Spike raw data
-spike/*/data.json
-spike/*/__pycache__/
-
-# Logs
-*.log
-npm-debug.log*
-
 # OS
 .DS_Store
 Thumbs.db
 
-# Local env
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Build outputs
+dist/
+build/
+out/
+*.tsbuildinfo
+
+# Electron
+electron/dist/
+electron/build/
+
+# Logs
+logs/
+*.log
+
+# Environment
 .env
 .env.local
+.env.*.local
 
-# Research materials (large binaries and reference docs, kept locally)
-Document/Research/
+# Test coverage
+coverage/
+.nyc_output/
 
-# Local configuration (may contain secrets)
-SourceCode/config/*
-!SourceCode/config/config.example.json
+# Temporary files
+*.tmp
+.cache/
+temp/
 
-# CodeGraph local data
+# SDD generated (optional, if any)
+# Document/design/interface-contracts-auto.md
+
+# CodeGraph index (generated)
 .codegraph/
 
-# Spike directories are not version-controlled (see CLAUDE.md)
+# Spike directory (exploratory code, not committed)
 spike/
+
+# Backend specific
+SourceCode/backend/.env
+SourceCode/backend/dist/
+SourceCode/backend/node_modules/
+
+# Frontend specific
+SourceCode/frontend/dist/
+SourceCode/frontend/node_modules/
+
+# Config overrides (keep template)
+SourceCode/config/config.json
+!SourceCode/config/config.json.template

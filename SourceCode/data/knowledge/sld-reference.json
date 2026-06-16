@@ -1,0 +1,126 @@
+{
+  "version": "1.0.0",
+  "description": "OGC SLD 1.0.0 元素速查。用于 LLM 理解 SLD XML 结构与 GeoStyler 映射。",
+  "root": {
+    "element": "StyledLayerDescriptor",
+    "attributes": {
+      "version": "1.0.0",
+      "xmlns": "http://www.opengis.net/sld",
+      "xmlns:ogc": "http://www.opengis.net/ogc"
+    },
+    "children": ["NamedLayer"]
+  },
+  "elements": {
+    "NamedLayer": {
+      "description": "命名图层容器。",
+      "children": ["Name", "UserStyle"]
+    },
+    "UserStyle": {
+      "description": "用户定义的样式。",
+      "children": ["Name", "Title", "Abstract", "IsDefault", "FeatureTypeStyle"]
+    },
+    "FeatureTypeStyle": {
+      "description": "FeatureTypeStyle 控制绘制顺序（Z-Order），一个 UserStyle 可含多个。",
+      "children": ["Title", "Abstract", "FeatureTypeName", "Rule"]
+    },
+    "Rule": {
+      "description": "样式执行单元。",
+      "children": ["Name", "Title", "Abstract", "MinScaleDenominator", "MaxScaleDenominator", "ElseFilter", "ogc:Filter", "PointSymbolizer", "LineSymbolizer", "PolygonSymbolizer", "TextSymbolizer", "RasterSymbolizer"]
+    },
+    "ElseFilter": {
+      "description": "空元素。若 Rule 包含 ElseFilter，则当前面 Rule 都不匹配时生效。"
+    },
+    "MinScaleDenominator": {
+      "description": "规则生效的最小比例尺（地图放大到该比例尺以下时仍生效）。",
+      "valueType": "number"
+    },
+    "MaxScaleDenominator": {
+      "description": "规则生效的最大比例尺（地图缩小到该比例尺以上时仍生效）。",
+      "valueType": "number"
+    },
+    "PointSymbolizer": {
+      "description": "点符号。MVP 中对应 GeoStyler Mark Symbolizer。",
+      "children": ["Graphic"]
+    },
+    "LineSymbolizer": {
+      "description": "线符号。",
+      "children": ["Stroke"]
+    },
+    "PolygonSymbolizer": {
+      "description": "面符号。",
+      "children": ["Fill", "Stroke"]
+    },
+    "TextSymbolizer": {
+      "description": "文本标注符号。",
+      "children": ["Label", "Font", "LabelPlacement", "Halo", "Fill"]
+    },
+    "RasterSymbolizer": {
+      "description": "栅格符号。MVP 不编辑。",
+      "children": ["Opacity", "ChannelSelection", "ColorMap", "ContrastEnhancement"]
+    },
+    "Graphic": {
+      "description": "点图形容器。",
+      "children": ["Mark", "Size"]
+    },
+    "Mark": {
+      "description": "预定义形状。",
+      "children": ["WellKnownName", "Fill", "Stroke"]
+    },
+    "WellKnownName": {
+      "description": "形状名称。",
+      "commonValues": ["circle", "square", "triangle", "star", "cross", "x"]
+    },
+    "Size": {
+      "description": "点大小，单位像素。",
+      "valueType": "number"
+    },
+    "Fill": {
+      "description": "填充样式。",
+      "children": ["CssParameter"]
+    },
+    "Stroke": {
+      "description": "描边/线样式。",
+      "children": ["CssParameter"]
+    },
+    "CssParameter": {
+      "description": "SVG/CSS 风格参数，由 name 属性指定参数名。",
+      "attributes": { "name": "string" },
+      "commonNames": {
+        "fill": "填充颜色",
+        "fill-opacity": "填充不透明度",
+        "stroke": "描边/线颜色",
+        "stroke-width": "描边/线宽度",
+        "stroke-dasharray": "虚线模式",
+        "stroke-linecap": "线端样式",
+        "stroke-linejoin": "线连接样式",
+        "font-family": "字体",
+        "font-size": "字号",
+        "font-weight": "字重"
+      }
+    },
+    "Label": {
+      "description": "标注内容，通常为 ogc:PropertyName。",
+      "children": ["ogc:PropertyName"]
+    },
+    "Font": {
+      "description": "字体设置。",
+      "children": ["CssParameter"]
+    },
+    "LabelPlacement": {
+      "description": "标注位置。",
+      "children": ["PointPlacement", "LinePlacement"]
+    },
+    "PointPlacement": {
+      "description": "点场景标注位置。",
+      "children": ["AnchorPoint", "Displacement", "Rotation"]
+    },
+    "AnchorPoint": {
+      "description": "标注锚点。",
+      "children": ["AnchorPointX", "AnchorPointY"]
+    },
+    "Displacement": {
+      "description": "标注位移。",
+      "children": ["DisplacementX", "DisplacementY"]
+    }
+  }
+}

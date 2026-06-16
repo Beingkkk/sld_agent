@@ -1,224 +1,256 @@
-# plan-frontend — Vue 3 + Electron 前端
+# Plan: Frontend（Vue 3 用户界面与预览）
 
-> 文档定位：SDD 模块设计，编码唯一依据。  
-> 关联需求：FR-01, FR-06 ~ FR-12, FR-16 ~ FR-18, NFR-07, NFR-08。  
-003e 关联设计：[Document/design/interface-contracts.md](../design/interface-contracts.md)、[Document/design/filter-editor.md](../design/filter-editor.md)。
-
----
-
-## 1. 模块目标
-
-实现桌面应用用户界面：左侧 Assistant 聊天、中间 Map Preview、右侧 Inspector（含 GeoStyler/参数/SLD/Rules 标签）、顶部 Toolbar、底部 StatusBar。通过原生 WebSocket 直连后端。
+> 版本：v1.0.0  
+> 状态：锁定  
+> 依赖：spec v1.0.0、constitution v1.0.0、plan-core v1.0.0  
+> 对应需求：M-01、M-02、M-03、M-05、M-06、S-01、S-02
 
 ---
 
-## 2. 职责边界
+## 1. 目标与边界
+
+Frontend 模块负责三栏桌面界面：左侧 SLD 树、中间属性编辑 + 地图预览、右侧代码 + 校验。所有业务状态来自 Core 的 `TreeStateSnapshot`，前端本身不持有样式真相。
+
+本模块以 workspace package 形式存在于 `SourceCode/frontend/`，通过 workspace 协议依赖 `SourceCode/core/`。
+
+**UX 对齐要求**：前端实现必须严格对齐 [`Document/UX/design.md`](Document/UX/design.md) 与 [`Document/UX/prototype.html`](Document/UX/prototype.html)，包括色彩系统、字体、三栏比例、组件状态、交互反馈与暗色主题。
+
+**边界内**：
+- 三栏布局与响应式折叠。
+- SLD 树组件（渲染、选中、展开、右键菜单、拖拽排序）。
+- 动态属性表单（UserStyle / FeatureTypeStyle / Rule / Symbolizer）。
+- 代码展示（GeoStyler JSON / SLD XML / 校验结果）。
+- OpenLayers 实时预览。
+- 导入/导出 SLD 文件对话框（通过 Electron IPC 调用原生对话框）。
+- 与后端的 **WebSocket** 通信。
+
+**边界外**：
+- LLM 语义解析与 Agent 逻辑（plan-backend）。
+- SLD XML 的底层解析与生成（plan-core）。
+- 文件系统持久化实现细节（Electron main 进程）。
+
+## 2. 核心组件设计
+
+### 2.1 `AppLayout`（三栏布局）
+
+```vue
+<!-- 伪代码 -->
+<AppLayout>
+  <template #tree><SLDTreePanel /></template>
+  <template #editor><EditorPanel /></template>
+  <template #code><CodePanel /></template>
+</AppLayout>
+```
+
+### 2.2 `SLDTreePanel`
+
+- 渲染 `SLDTreeNode` 递归列表。
+- 节点标题**仅显示完整 XML 标签名**（如 `sld:NamedLayer`、`sld:PointSymbolizer`），不额外显示 GeoStyler kind 或中文语义。
+- 不同节点类型通过图标和颜色区分（见 [`Document/UX/design.md`](Document/UX/design.md) §4.2）。
+- 维护 `selectedPath`、`expandedPaths`。
+- 右键菜单：`Add Rule`、`Add Symbolizer`、`Delete`。
+- 拖拽：仅允许同层级（FeatureTypeStyle 之间 / Rule 之间 / Symbolizer 之间）排序。
+- 受 Core 约束，NamedLayer 与 UserStyle 节点不允许新增第二个。
+
+Symbolizer 节点显示的 XML 标签与 GeoStyler kind 的对应关系：
+
+| GeoStyler kind | 树上显示的 XML 标签 |
+| :--- | :--- |
+| `Mark` | `sld:PointSymbolizer` |
+| `Line` | `sld:LineSymbolizer` |
+| `Fill` | `sld:PolygonSymbolizer` |
+| `Text` | `sld:TextSymbolizer` |
+
+### 2.3 `EditorPanel`
+
+- 上半部分：`PropertyForm`（根据 `selectedPath` 的节点类型动态渲染）。
+- 下半部分：`MapPreview`（OpenLayers 地图）。
+- 可选：右侧悬浮 `LLMPropertyChat` 卡片。
+
+### 2.4 `PropertyForm`（JSON 驱动 + 分组）
+
+`PropertyForm` 不再按节点类型硬编码子组件，而是根据运行时加载的 registry 动态生成，并支持按语义分组折叠。
+
+渲染流程：
+
+```text
+selectedPath
+  → 判断节点类型（UserStyle / FeatureTypeStyle / Rule / Symbolizer）
+  → 从 node-schemas.json 或 symbolizer-schemas.json 获取字段列表与分组定义
+  → 遍历字段 ID，从 field-registry.json 读取字段元数据（含 `group`）
+  → 按 group 聚合字段，渲染可折叠的分组面板
+  → 从 editor-types.json 获取对应编辑器组件
+  → 渲染通用编辑器并绑定到 Store
+```
+
+核心组件：
 
 | 组件 | 职责 |
-|---|---|
-| `main.ts` | Electron 主进程入口：启动/停止后端、加载渲染页、管理窗口 |
-| `preload.ts` | 安全桥接（按需，MVP 先用原生 WebSocket） |
-| `App.vue` | 根布局 |
-| `AssistantPanel` | 自然语言输入与聊天历史 |
-| `MapPreview` | OpenLayers 实时预览 |
-| `InspectorPanel` | 右侧检查器：参数面板、规则列表、GeoStyler JSON、SLD XML |
-| `RulesPanel` | Rule 增删改查、排序、启用/禁用 |
-| `SymbolizerEditor` | 点/线/面/文本 Symbolizer 参数表单 |
-| `FilterEditor` | 见 `plan-filter-editor.md` |
-| `ValidationPanel` | 校验结果展示 |
-| `Toolbar` | 导入/导出/设置/撤销重做 |
-| `StatusBar` | 后端状态、校验摘要、当前比例尺 |
-| `WsClient` | WebSocket 连接与请求封装 |
-| `StyleStore` | Pinia 全局状态：currentStyle、lastValidStyle、params、sldXml、validation |
-| `FileService` | 文件选择/保存对话框、最近文件记录 |
+| :--- | :--- |
+| `PropertyForm` | 根据节点类型获取 schema；`symbolizer-schemas.json` 按 `groups` 渲染折叠分组，`node-schemas.json` 按 `fields` 渲染默认分组。 |
+| `FormFieldRenderer` | 根据字段 `editor` 类型分发到具体编辑器组件。 |
+| `PropertyGroup` | 可折叠分组容器，聚合 symbolizer schema 中定义的字段。 |
+| `StringEditor` / `NumberEditor` / `ColorEditor` / `EnumEditor` / `BooleanEditor` / `TextareaEditor` / `OpacityEditor` / `ScaleRangeEditor` / `Point2DEditor` / `NumberArrayEditor` / `FontEditor` / `FilterEditor` | 通用编辑器控件，由 `editor-types.json` 定义。 |
 
----
+字段值写回 Store 时，按 `field.valuePath` 写入树节点字段；树 → GeoStyler 的转换由 Core `SymbolizerTransformer` 负责，前端不直接处理 GeoStyler 字段映射。
 
-## 3. 目录结构
+### 2.4.1 字段配置来源
 
-```
-SourceCode/frontend/
-├── electron/
-│   ├── main.ts
-│   └── preload.ts
-├── src/
-│   ├── main.ts
-│   ├── App.vue
-│   ├── components/
-│   │   ├── AssistantPanel.vue
-│   │   ├── MapPreview.vue
-│   │   ├── InspectorPanel.vue
-│   │   ├── RulesPanel.vue
-│   │   ├── SymbolizerEditor.vue
-│   │   ├── ValidationPanel.vue
-│   │   ├── Toolbar.vue
-│   │   └── StatusBar.vue
-│   ├── composables/
-│   │   ├── useWsClient.ts
-│   │   └── useMapPreview.ts
-│   ├── stores/
-│   │   └── styleStore.ts
-│   ├── services/
-│   │   ├── wsClient.ts
-│   │   └── fileService.ts
-│   └── styles/
-│       └── main.css
-├── index.html
-├── package.json
-├── vite.config.ts
-├── tsconfig.json
-└── electron-builder.yml
+前端在应用启动时加载以下外置 JSON：
+
+- `SourceCode/data/registry/editor-types.json`
+- `SourceCode/data/registry/field-registry.json`
+- `SourceCode/data/registry/node-schemas.json`
+- `SourceCode/data/registry/symbolizer-schemas.json`
+
+### 2.5 `MapPreview`
+
+```typescript
+interface MapPreviewProps {
+  geoStylerStyle: GeoStylerStyle;
+  previewGeometryType: 'Mark' | 'Line' | 'Fill' | 'Text';
+}
 ```
 
----
+- 使用单个 OpenLayers `VectorLayer` + `VectorSource`。
+- 预览数据来自 `SourceCode/data/sample/` 下的内置 **GeoJSON**（由 shapefile 预转换），MVP 阶段直接读取本地文件，不上传。
+- `previewGeometryType` 默认由当前选中节点推导：
+  - 选中 Symbolizer → 使用其 `kind`。
+  - 选中 Rule / FeatureTypeStyle / UserStyle → 回退到该节点下第一个 Symbolizer 的 `kind`；无 Symbolizer 时默认 `Mark`。
+- **保留手动切换按钮**（点 / 线 / 面 / 文本），便于用户临时查看其他几何类型的效果。
+- Text Symbolizer 预览使用内置点 Sample 数据；若数据中存在 `name` 字段则用作 label，否则仅显示占位提示（不渲染文本）。
+- Raster Symbolizer 预览不在 MVP 范围内（见 §6 决策）。
+- 使用 `geostyler-openlayers-parser` 将 GeoStyler Style 转为 OpenLayers Style；不匹配当前几何类型的 Rule 会被 parser 自然忽略。
+
+### 2.6 `CodePanel`
+
+- 标签页：`GeoStyler JSON`、`SLD XML`、`Validation`。
+- 代码只读，使用等宽字体与语法高亮（可引入 `prismjs` 或 `highlight.js`）。
+- 校验面板展示 `ValidationIssue[]`。
+
+## 3. 状态管理（Pinia）
+
+```typescript
+interface FrontendState {
+  tree: SLDTree;
+  selectedPath: TreePath | null;
+  expandedPaths: Set<string>;
+  transformResult: TransformResult | null;
+  issues: ValidationIssue[];
+  backendStatus: 'idle' | 'connecting' | 'connected' | 'error';
+}
+```
+
+Actions：
+- `selectNode(path)`
+- `toggleExpanded(path)`
+- `addNode(parentPath, type, kind)`
+- `removeNode(path)`
+- `updateNode(path, patch)`
+- `moveNode(sourcePath, targetPath)`
+- `importSLD(xml)` → 调用 Core `SLDTree.fromSLDXML`
+- `exportSLD()` → 调用 Core `tree.toSLDXML`
 
 ## 4. 接口定义
 
-### 4.1 WsClient 对外接口
+### 4.1 与 Core 的接口
 
-```typescript
-interface WsClientOptions {
-  url: string;
-  onMessage?: (msg: WsMessage) => void;
-  onClose?: () => void;
-  onError?: (err: Error) => void;
-}
+Frontend 直接导入 Core 包中的类：
+- `SLDTree`
+- `TreePath`
+- `GeoStylerTransformer`
+- `ValidationEngine`
+- `TransformResult`
+- `ValidationIssue`
 
-interface WsClient {
-  connect(): Promise<void>;
-  disconnect(): void;
-  send<T = unknown>(type: string, payload: unknown, timeoutMs?: number): Promise<T>;
-}
-```
+### 4.2 与后端的 WebSocket 消息
 
-### 4.2 StyleStore 对外接口
+| 方向 | 消息类型 | 载荷 | 说明 |
+| :--- | :--- | :--- | :--- |
+| 前端 → 后端 | `explain_rule` | `{ treeSnapshot, path }` | 请求解释当前 Rule。 |
+| 后端 → 前端 | `rule_explanation` | `{ text, warnings? }` | 返回自然语言解释与可选预警。 |
+| 前端 → 后端 | `explain_property` | `{ nodeType, fieldName, value }` | 请求属性字段解释。 |
+| 后端 → 前端 | `property_explanation` | `{ text }` | 返回属性说明。 |
 
-```typescript
-interface StyleState {
-  currentStyle?: Style;
-  sldXml?: string;
-  params?: StyleParams;
-  validation?: ValidationReport;
-  explanation?: string;
-  chatHistory: ChatMessage[];
-  busy: boolean;
-  connected: boolean;
-}
+### 4.3 与 Electron Main 的 IPC
 
-interface StyleStoreActions {
-  generate(instruction: string, geometryType: string): Promise<void>;
-  modify(instruction: string): Promise<void>;
-  applyPatch(patches: StylePatch[]): Promise<void>;
-  importStyle(style: Style): Promise<void>;
-  exportSld(): Promise<string>;  // `export` 是 JS 保留字，使用 exportSld
-  setDomain(domain: string): Promise<void>;
-}
-```
-
-### 4.3 FileService 对外接口
-
-```typescript
-interface FileService {
-  openGeoJson(): Promise<{ path: string; content: string } | undefined>;
-  openSld(): Promise<{ path: string; content: string } | undefined>;
-  saveSld(defaultName: string, xml: string): Promise<string | undefined>;
-  getRecentFiles(): string[];
-}
-```
-
----
+| 通道 | 方向 | 载荷 | 说明 |
+| :--- | :--- | :--- | :--- |
+| `dialog:openSld` | 渲染 → 主进程 → 渲染 | `{ filePath, content }` | 打开 SLD 文件。 |
+| `dialog:saveSld` | 渲染 → 主进程 | `{ filePath, content }` | 保存 SLD 文件。 |
 
 ## 5. 数据流
 
-### 5.1 生成样式
+用户点击树节点
+  → `store.selectNode(path)`
+  → `PropertyForm` 根据节点类型渲染
+  → 同步根据选中节点推导 `previewGeometryType`（Symbolizer.kind 或回退到第一个 Symbolizer）
+  → 用户修改字段
+  → `store.updateNode(path, patch)`
+  → Core `SLDTree.updateNode()` 返回新树
+  → `GeoStylerTransformer` + `geostyler-sld-parser` 生成 GeoStyler JSON / SLD XML
+  → `ValidationEngine.validate()` 更新 issues
+  → `MapPreview` 接收 GeoStyler Style 与 `previewGeometryType`，刷新 OpenLayers
+  → `CodePanel` 刷新代码与校验列表
 
-```
-用户输入指令
-  → AssistantPanel
-  → styleStore.generate()
-  → WsClient.send('generate')
-  → 后端处理
-  ← WsClient 收到 generation_result
-  → StyleStore 更新 state
-  → MapPreview / InspectorPanel / RulesPanel / ValidationPanel 响应式更新
-```
+## 6. 关键决策
 
-### 5.2 参数化精修
+| 决策 | 方案 | 原因 |
+| :--- | :--- | :--- |
+| 状态管理 | Pinia | Vue 3 官方推荐，DevTools 支持好。 |
+| 拖拽库 | `@vueuse/gesture` 或原生 HTML5 Drag & Drop | 原生足够，避免引入过重库。 |
+| 代码高亮 | `highlight.js` | 轻量，支持 JSON/XML。 |
+| OpenLayers 包装 | 直接封装 `MapPreview` 组件 | 控制力强，便于与 geostyler-openlayers-parser 集成。 |
+| 预览数据切换 | 自动推导 + **保留手动切换按钮**（点/线/面/文本） | 兼顾自动化与临时查看需求。 |
+| 预览数据来源 | 读取 `SourceCode/data/sample/` 内置 **GeoJSON**（shapefile 预转换） | 离线优先，OpenLayers 原生支持 GeoJSON。 |
+| 主题方案 | MVP 仅暗色主题，不实现亮/暗切换 | 降低实现成本，符合 UX 原型。 |
+| 字体加载 | 本地 TTF 文件，离线优先 | 符合宪法 CP-3；避免外部 CDN 依赖。 |
+| 树节点标签 | 显示完整 XML 标签名（如 `sld:NamedLayer`），不显示 kind 或中文语义 | 满足专业用户对 SLD 层级的直观认知；图标/颜色区分类型。 |
+| NamedLayer / UserStyle 数量 | MVP 仅允许各一个 | 降低多容器管理的 UI 与状态复杂度。 |
+| AI 面板 | 右侧面板底部独立卡片，琥珀色左边框，可折叠 | 与 UX 原型一致。 |
+| Text Symbolizer 预览 | 纳入 MVP；若 sample 数据有 `name` 字段则渲染 label，否则仅显示占位提示 | 常见组合（点 + 标注）需要预览支持。 |
+| Raster Symbolizer 预览 | 放到 Phase 2 | 需要栅格渲染与专用 Sample 数据，超出 MVP 范围。 |
+| 项目结构 | monorepo workspace，`frontend` 依赖 `core` package | 共享数据模型与转换逻辑，统一 parser 版本。 |
+| UX 对齐 | 严格对齐 [`Document/UX/design.md`](Document/UX/design.md) 与 [`Document/UX/prototype.html`](Document/UX/prototype.html) | 保证实现与原型一致，避免实现偏离设计。 |
+| 前后端通信 | 开发与生产均使用 **WebSocket**；IPC 仅用于 Electron 原生能力（窗口/文件对话框） | 协议一致，减少双路径；IPC 保留给必须原生的能力。 |
+| 属性面板 | **JSON 驱动 + 分组折叠**：从 `SourceCode/data/registry/*.json` 加载字段、分组、编辑器类型，动态渲染 | 新增字段或 Symbolizer 类型无需改 Vue 代码；同一份 registry 服务 LLM。 |
 
-```
-用户在 Inspector 修改参数
-  → 本地 optimistic 更新 StyleStore.currentStyle
-  → 用户点击“应用”
-  → styleStore.applyPatch(patches)
-  → WsClient.send('apply_patch')
-  ← 成功：提交 optimistic 更新
-  ← 失败：撤销 optimistic 更新并提示
-```
+## 6.1 错误处理与降级策略
 
-### 5.3 导出 SLD
+| 场景 | 行为 |
+| :--- | :--- |
+| WebSocket 断开 | 状态栏显示“后端未连接”与重连按钮；前端仍可离线编辑树，重连后无需恢复。 |
+| LLM 调用失败 | AI 面板显示“解释服务暂不可用”，不阻塞核心编辑。 |
+| `geostyler-sld-parser` 解析失败 | 校验面板报 error；导入操作失败并显示可读的解析错误。 |
+| Sample 数据缺失或字段不存在 | 预览区显示占位提示，不抛异常；Text label 缺失时不渲染文本。 |
+| 拖拽到非法位置 | 视觉拒绝（无放置指示线），不更新 Store。 |
 
-```
-用户点击导出
-  → styleStore.export()
-  → WsClient.send('export')
-  ← 收到 sldXml + validation
-  → FileService.saveSld()
-  → 落盘
-```
+## 7. 测试策略
 
----
+- **单元测试**：Pinia store actions、表单字段映射、TreePath 工具。
+- **组件测试**：使用 Vue Test Utils 测试 `PropertyForm` 根据节点类型切换。
+- **集成测试**：导入 example-sld.xml → 树渲染 → 修改字段 → 代码区更新。
 
-## 6. 关键规则
+## 8. 任务清单
 
-### 6.1 WebSocket 启动
+- [DF-001] 初始化 Vue 3 + TypeScript + Tailwind 项目骨架。
+- [DF-002] 配置 Pinia store 与 Core 模块依赖。
+- [DF-003] 实现三栏布局 `AppLayout`，严格对齐 UX 原型（色彩、字体、比例、间距）。
+- [DF-004] 实现 `SLDTreePanel` 与递归节点渲染。
+- [DF-005] 实现右键菜单与节点增删。
+- [DF-006] 实现同层级拖拽排序。
+- [DF-007] 加载 `SourceCode/data/registry/*.json` 作为静态资源。
+- [DF-008] 实现通用编辑器组件：String / Number / Color / Enum / Boolean / Textarea / Opacity / ScaleRange / Point2D / NumberArray / Font / Filter。
+- [DF-009] 实现 JSON 驱动的 `PropertyForm`、`FormFieldRenderer` 与 `PropertyGroup` 分组折叠。
+- [DF-010] 实现 `MapPreview`：自动推导 + 手动切换 Sample 数据；Text 预览使用 `name` 字段。
+- [DF-011] 实现 `CodePanel`（JSON/XML/校验标签页）。
+- [DF-012] 实现导入/导出 IPC 调用。
+- [DF-013] 接入后端 WebSocket 消息（explain_rule / explain_property）。
+- [DF-014] 编写组件与集成测试。
 
-- Electron 主进程启动后端并解析 `READY ws://localhost:{port}`。
-- 渲染页 URL 为 `file://.../index.html?port={port}`。
-- `WsClient` 从 URL 查询参数读取端口后连接。
+## 9. 风险与依赖
 
-### 6.2 乐观更新
-
-- `apply_patch` 采用乐观更新，失败时撤销。
-- `generate`/`modify` 不乐观更新，等待后端响应。
-
-### 6.3 Map Preview
-
-- 使用 `geostyler-openlayers-parser` 将 `currentStyle` 转为 OpenLayers Style。
-- MVP 使用内置示例几何（点/线/面）。
-- 明确提示“预览仅供参考，最终效果以 GeoServer/QGIS 为准”。
-
-### 6.4 UI 布局
-
-- 左侧 Assistant：宽度 320px，可折叠。
-- 中间 Map Preview：自适应。
-- 右侧 Inspector：宽度 420px，可折叠。
-- 顶部 Toolbar：高度 48px。
-- 底部 StatusBar：高度 28px。
-
----
-
-## 7. 任务清单（TDD）
-
-- [x] RED: 编写 `WsClient` 连接/请求/超时测试（mock WebSocket）
-- [x] GREEN: 实现 `WsClient`
-- [x] RED: 编写 `StyleStore` generate/applyPatch/export 状态变化测试
-- [x] GREEN: 实现 `StyleStore`
-- [x] RED: 编写 `fileService` 调用 Electron API 测试（mock）
-- [x] GREEN: 实现 `FileService`
-- [ ] RED: 编写 `MapPreview` OpenLayers 初始化测试
-- [x] GREEN: 实现 `MapPreview.vue`
-- [ ] RED: 编写 `InspectorPanel` 标签切换测试
-- [x] GREEN: 实现 `InspectorPanel.vue`
-- [ ] RED: 编写 `RulesPanel` 增删改查测试
-- [x] GREEN: 实现 `RulesPanel.vue`
-- [ ] RED: 编写 Electron 主进程启动/停止后端测试
-- [x] GREEN: 实现 `electron/main.ts`
-- [ ] REFACTOR: 统一组件 props/emits 命名（后续继续）
-
----
-
-## 8. 版本历史
-
-| 版本 | 日期 | 说明 |
-|---|---|---|
-| 1.0.0 | 2026-06-15 | 初始 plan |
+- **OpenLayers 打包体积**：按需引入 `ol` 子模块，避免全量导入。
+- **Core 模块稳定性**：Frontend 高度依赖 Core 类型与转换逻辑，需等 Core 单元测试通过后再深度集成。
+- **拖拽体验**：原生 HTML5 DnD 在 Electron 中可能行为不一致，需单独测试。
+- **Filter 可视化构造器**：属于 Should Have，若时间不足可降级为 CQL 文本输入。

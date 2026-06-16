@@ -1,0 +1,12 @@
+{
+  "version": "1.0.0",
+  "description": "知识库领域目录。当前仅包含通用领域，后续可按需扩展交通、土地利用等。",
+  "domains": [
+    {
+      "id": "default",
+      "name": "通用",
+      "description": "通用点线面文本样式规则",
+      "default": true
+    }
+  ]
+}

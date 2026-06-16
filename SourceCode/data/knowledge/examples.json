@@ -1,0 +1,76 @@
+{
+  "version": "1.0.0",
+  "description": "Few-shot 样例，用于 LLM 理解如何将自然语言需求转换为 SLDAgent 内部树结构。",
+  "examples": [
+    {
+      "userPrompt": "把所有学校渲染成红色 12px 圆点，并显示 name 字段作为标注。",
+      "explanation": "学校属于点要素；需要 Mark Symbolizer 红色圆点 + Text Symbolizer 标注；Filter 筛选 facility_type = 'school'。",
+      "treeOperations": [
+        {
+          "action": "addRule",
+          "parentPath": [0, 0, 0],
+          "rule": {
+            "name": "学校点规则",
+            "title": "学校设施",
+            "filter": "facility_type = 'school'",
+            "symbolizers": [
+              {
+                "kind": "Mark",
+                "wellKnownName": "circle",
+                "size": 12,
+                "fillColor": "#FF0000",
+                "fillOpacity": 1,
+                "strokeColor": "#000000",
+                "strokeWidth": 0
+              },
+              {
+                "kind": "Text",
+                "label": "name",
+                "fontFamily": "Arial",
+                "fontSize": 12,
+                "fontWeight": "normal",
+                "strokeColor": "#000000"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "userPrompt": "主干道用红色 4px 实线，普通道路用灰色 2px 虚线。",
+      "explanation": "道路属于线要素；需要两个 Rule，分别按 road_class 筛选；虚线模式用 [4, 2]。",
+      "treeOperations": [
+        {
+          "action": "addRule",
+          "rule": {
+            "name": "主干道规则",
+            "filter": "road_class = 'highway'",
+            "symbolizers": [
+              {
+                "kind": "Line",
+                "strokeColor": "#FF0000",
+                "strokeWidth": 4,
+                "strokeDasharray": []
+              }
+            ]
+          }
+        },
+        {
+          "action": "addRule",
+          "rule": {
+            "name": "普通道路规则",
+            "filter": "road_class = 'local'",
+            "symbolizers": [
+              {
+                "kind": "Line",
+                "strokeColor": "#999999",
+                "strokeWidth": 2,
+                "strokeDasharray": [4, 2]
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
