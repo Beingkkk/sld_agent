@@ -3,6 +3,7 @@ import { ref, watch, computed } from 'vue';
 import { useSLDStore } from '../../store';
 import {
   applyPreviewStyle,
+  buildSymbolizerPreviewStyle,
   getGeoStylerStyle,
   type PreviewGeometryType,
 } from '../../services/preview-style';
@@ -23,8 +24,12 @@ const activeGeometryType = computed<PreviewGeometryType>(() => {
 });
 
 async function applyStyle() {
-  const geoStylerStyle = getGeoStylerStyle(store.transformResult);
-  const result = await applyPreviewStyle(geoStylerStyle, activeGeometryType.value);
+  const fullStyle = getGeoStylerStyle(store.transformResult);
+  const previewStyle =
+    store.selectedNode?.type === 'Symbolizer'
+      ? buildSymbolizerPreviewStyle(store.selectedNode) ?? fullStyle
+      : fullStyle;
+  const result = await applyPreviewStyle(previewStyle, activeGeometryType.value);
   setStyle(result.style);
 }
 
@@ -46,6 +51,10 @@ watch(() => store.previewGeometryType, () => {
   manualGeometryType.value = null;
   refresh();
 });
+
+// 当在同一 Rule 下的同类型 Symbolizer 之间切换时，transformResult 与
+// previewGeometryType 都不会变化，但选中节点已改变，需要单独监听并更新预览。
+watch(() => store.selectedPath, applyStyle);
 </script>
 
 <template>

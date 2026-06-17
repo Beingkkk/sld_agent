@@ -6,6 +6,7 @@ import {
   Text as TextStyle,
 } from 'ol/style';
 import OpenLayersParser from 'geostyler-openlayers-parser';
+import { SymbolizerTransformer } from '@sldagent/core';
 
 export type PreviewGeometryType = 'Mark' | 'Line' | 'Fill' | 'Text';
 
@@ -34,6 +35,22 @@ export function getGeoStylerStyle(transformResult: any): any {
   } catch {
     return null;
   }
+}
+
+/**
+ * 当选中 Symbolizer 节点时，构造仅包含该 Symbolizer 的临时 GeoStyler Style，
+ * 使预览能够单独反映当前 Symbolizer 的样式，而不是整个 Rule 的叠加效果。
+ */
+export function buildSymbolizerPreviewStyle(selectedNode: any): any {
+  if (!selectedNode || selectedNode.type !== 'Symbolizer') return null;
+  const symbolizer = SymbolizerTransformer.toGeoStyler(
+    selectedNode.kind,
+    selectedNode.data || {},
+  );
+  return {
+    name: 'preview',
+    rules: [{ name: 'preview', symbolizers: [symbolizer] }],
+  };
 }
 
 function createMarkFallbackStyle(): Style {
