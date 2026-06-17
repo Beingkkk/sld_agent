@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
+import sampleUrl from '@data/sample/sld_cookbook_point.geojson?url';
 
 const props = defineProps<{
   modelValue: string;
@@ -13,7 +14,7 @@ const properties = ref<string[]>(['name']);
 
 onMounted(async () => {
   try {
-    const response = await fetch('/sample/sld_cookbook_point.geojson');
+    const response = await fetch(sampleUrl);
     const data = await response.json();
     if (data.features?.[0]?.properties) {
       properties.value = Object.keys(data.features[0].properties);

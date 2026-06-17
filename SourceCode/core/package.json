@@ -1,6 +1,7 @@
 {
   "name": "@sldagent/core",
   "version": "1.0.0",
+  "type": "module",
   "description": "SLDAgent core - SLD tree data model, transformer, and validation engine",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

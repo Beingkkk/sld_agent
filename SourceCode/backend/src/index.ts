@@ -13,8 +13,13 @@ const __dirname = dirname(__filename);
 async function main(): Promise<void> {
   const config = loadConfig();
 
-  // Determine data path relative to this file
-  const dataPath = resolve(__dirname, '../../data');
+  // Determine data path: allow Electron main process to override, otherwise fall
+  // back to development layout and then to Electron packaged resources.
+  const dataPath =
+    process.env.SLDAGENT_DATA_PATH ||
+    resolve(__dirname, '../../data');
+
+  console.log(`[Main] Data path: ${dataPath}`);
 
   const knowledgeBase = new KnowledgeBase(dataPath);
   await knowledgeBase.load();

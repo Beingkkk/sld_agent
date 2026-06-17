@@ -6,7 +6,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc -b",
+    "build": "tsc -b && node -e \"const fs=require('fs'); fs.copyFileSync('package.json', 'dist/package.json');\"",
     "dev": "tsx src/index.ts",
     "test": "vitest run"
   },

@@ -67,7 +67,7 @@ class SLDAgentApp {
     if (this.isDev()) {
       this.mainWindow.loadURL('http://localhost:5173');
     } else {
-      const indexPath = path.join(app.getAppPath(), 'SourceCode', 'frontend', 'dist', 'index.html');
+      const indexPath = path.join(app.getAppPath(), 'frontend', 'dist', 'index.html');
       this.mainWindow.loadFile(indexPath);
     }
 
@@ -88,10 +88,10 @@ class SLDAgentApp {
     // electron-builder places extra files relative to app.getAppPath()
     const appPath = app.getAppPath();
     const possiblePaths = [
-      path.join(appPath, 'SourceCode', 'backend', 'dist', 'index.js'),
-      path.join(appPath, '..', 'SourceCode', 'backend', 'dist', 'index.js'),
-      path.join(__dirname, '..', '..', 'backend', 'dist', 'index.js'),
-      path.join(process.resourcesPath, 'app', 'SourceCode', 'backend', 'dist', 'index.js'),
+      path.join(appPath, 'backend', 'dist', 'index.js'),
+      path.join(process.resourcesPath, 'app', 'backend', 'dist', 'index.js'),
+      path.join(process.resourcesPath, 'app.asar', 'backend', 'dist', 'index.js'),
+      path.join(__dirname, '..', 'backend', 'dist', 'index.js'),
     ];
 
     let backendPath: string | null = null;
@@ -107,13 +107,33 @@ class SLDAgentApp {
       return;
     }
 
-    console.log('[SLDAgent] Starting backend:', backendPath);
+    // Redirect backend logs to a file for easier debugging
+    const logsDir = path.join(app.getPath('userData'), 'logs');
+    fs.mkdirSync(logsDir, { recursive: true });
+    const logFile = path.join(logsDir, 'backend.log');
+    const logStream = fs.createWriteStream(logFile, { flags: 'a' });
+    const log = (msg: string) => {
+      const line = `[${new Date().toISOString()}] ${msg}\n`;
+      console.log(line.trim());
+      logStream.write(line);
+    };
+
+    log(`[SLDAgent] Starting backend: ${backendPath}`);
     this.backendProcess = fork(backendPath, [], {
-      cwd: path.dirname(backendPath),
+      cwd: process.resourcesPath,
       env: {
         ...process.env,
         SLDAGENT_CONFIG_PATH: this.resolveConfigPath(),
+        SLDAGENT_DATA_PATH: path.join(process.resourcesPath, 'data'),
       },
+      stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
+    });
+
+    this.backendProcess.stdout?.on('data', (data) => {
+      logStream.write(data.toString());
+    });
+    this.backendProcess.stderr?.on('data', (data) => {
+      logStream.write(data.toString());
     });
 
     this.backendProcess.on('error', (err) => {
@@ -142,14 +162,27 @@ class SLDAgentApp {
   }
 
   private resolveConfigPath(): string {
+    // 1. Config next to the executable (highest priority for deployment override)
+    const exeConfig = path.join(path.dirname(process.execPath), 'config.json');
+    if (fs.existsSync(exeConfig)) {
+      return exeConfig;
+    }
+
+    // 2. Packaged config directory (extraResources)
+    const resourcesConfig = path.join(process.resourcesPath, 'config', 'config.json');
+    if (fs.existsSync(resourcesConfig)) {
+      return resourcesConfig;
+    }
+
+    // 3. User data directory
     const userDataPath = app.getPath('userData');
     const userConfig = path.join(userDataPath, 'config.json');
     if (fs.existsSync(userConfig)) {
       return userConfig;
     }
-    // Fallback to built-in template (no real keys)
-    const appPath = app.getAppPath();
-    return path.join(appPath, 'SourceCode', 'config', 'config.json.template');
+
+    // 4. Built-in template (no real keys)
+    return path.join(process.resourcesPath, 'config', 'config.json.template');
   }
 
   private registerIpcHandlers(): void {
