@@ -48,6 +48,9 @@ temp/
 # SDD generated (optional, if any)
 # Document/design/interface-contracts-auto.md
 
+# Research assets (large/local reference materials, not committed)
+Document/Research/
+
 # CodeGraph index (generated)
 .codegraph/
 
