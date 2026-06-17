@@ -1,0 +1,68 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body, #app {
+    @apply h-full w-full overflow-hidden;
+    background-color: #0d1117;
+    color: #e6edf3;
+    font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #30363d #161b22;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: #161b22;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #30363d;
+    border-radius: 3px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #484f58;
+  }
+}
+
+@layer components {
+  .panel {
+    @apply bg-bg-secondary border border-border-default rounded-card;
+  }
+
+  .input-dark {
+    @apply bg-bg-tertiary border border-border-default rounded-input px-3 py-2 text-sm text-text-primary;
+    @apply focus:outline-none focus:border-accent-teal focus:ring-1 focus:ring-accent-teal/30;
+    @apply transition-colors;
+  }
+
+  .input-dark::placeholder {
+    @apply text-text-tertiary;
+  }
+
+  .btn-dark {
+    @apply bg-bg-tertiary border border-border-default rounded-btn px-3 py-1.5 text-sm text-text-primary;
+    @apply hover:bg-bg-hover active:bg-bg-active transition-colors;
+    @apply flex items-center gap-1.5;
+  }
+
+  .btn-accent {
+    @apply bg-accent-teal-dim border border-accent-teal/30 rounded-btn px-3 py-1.5 text-sm text-accent-teal;
+    @apply hover:bg-accent-teal/20 active:bg-accent-teal/30 transition-colors;
+    @apply flex items-center gap-1.5;
+  }
+
+  .code-block {
+    @apply font-mono text-sm leading-relaxed;
+    @apply bg-bg-primary rounded-card p-4 overflow-auto;
+  }
+}

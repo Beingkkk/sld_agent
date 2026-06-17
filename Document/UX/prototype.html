@@ -177,16 +177,24 @@
 
     .code-line {
       counter-increment: line;
+      display: flex;
+      align-items: baseline;
+      padding-left: 0.5em;
     }
 
     .code-line::before {
       content: counter(line);
       display: inline-block;
-      width: 2em;
+      width: 2.5em;
       margin-right: 1em;
       color: var(--text-tertiary);
       text-align: right;
       user-select: none;
+      flex-shrink: 0;
+    }
+
+    #tab-xml, #tab-json {
+      counter-reset: line;
     }
 
     .map-sample {
@@ -915,7 +923,7 @@
                   </div>
                   <div>
                     <label class="block text-xs text-txt-secondary mb-1.5">大小 (px)</label>
-                    <input type="number" value="12" class="input-field w-full bg-bg-tertiary border border-border rounded-md px-3 py-2 text-txt-primary text-sm">
+                    <input type="number" value="12" data-field="size" class="input-field w-full bg-bg-tertiary border border-border rounded-md px-3 py-2 text-txt-primary text-sm">
                   </div>
                 </div>
 
@@ -923,8 +931,8 @@
                   <div>
                     <label class="block text-xs text-txt-secondary mb-1.5">填充颜色</label>
                     <div class="flex items-center gap-2">
-                      <input type="color" value="#FF0000" class="w-9 h-9 rounded bg-transparent border-0 cursor-pointer">
-                      <input type="text" value="#FF0000" class="input-field flex-1 bg-bg-tertiary border border-border rounded-md px-3 py-2 text-txt-primary text-sm font-mono">
+                      <input type="color" value="#FF0000" data-field="color" class="w-9 h-9 rounded bg-transparent border-0 cursor-pointer">
+                      <input type="text" value="#FF0000" data-field="color" class="input-field flex-1 bg-bg-tertiary border border-border rounded-md px-3 py-2 text-txt-primary text-sm font-mono">
                     </div>
                   </div>
                   <div>
@@ -937,13 +945,13 @@
                   <div>
                     <label class="block text-xs text-txt-secondary mb-1.5">描边颜色</label>
                     <div class="flex items-center gap-2">
-                      <input type="color" value="#000000" class="w-9 h-9 rounded bg-transparent border-0 cursor-pointer">
-                      <input type="text" value="#000000" class="input-field flex-1 bg-bg-tertiary border border-border rounded-md px-3 py-2 text-txt-primary text-sm font-mono">
+                      <input type="color" value="#000000" data-field="strokeColor" class="w-9 h-9 rounded bg-transparent border-0 cursor-pointer">
+                      <input type="text" value="#000000" data-field="strokeColor" class="input-field flex-1 bg-bg-tertiary border border-border rounded-md px-3 py-2 text-txt-primary text-sm font-mono">
                     </div>
                   </div>
                   <div>
                     <label class="block text-xs text-txt-secondary mb-1.5">描边宽度 (px)</label>
-                    <input type="number" value="0" class="input-field w-full bg-bg-tertiary border border-border rounded-md px-3 py-2 text-txt-primary text-sm">
+                    <input type="number" value="0" data-field="strokeWidth" class="input-field w-full bg-bg-tertiary border border-border rounded-md px-3 py-2 text-txt-primary text-sm">
                   </div>
                 </div>
               </div>
@@ -967,13 +975,13 @@
                   <div>
                     <label class="block text-xs text-txt-secondary mb-1.5">颜色</label>
                     <div class="flex items-center gap-2">
-                      <input type="color" value="#FF0000" class="w-9 h-9 rounded bg-transparent border-0 cursor-pointer">
-                      <input type="text" value="#FF0000" class="input-field flex-1 bg-bg-tertiary border border-border rounded-md px-3 py-2 text-txt-primary text-sm font-mono">
+                      <input type="color" value="#FF0000" data-field="color" class="w-9 h-9 rounded bg-transparent border-0 cursor-pointer">
+                      <input type="text" value="#FF0000" data-field="color" class="input-field flex-1 bg-bg-tertiary border border-border rounded-md px-3 py-2 text-txt-primary text-sm font-mono">
                     </div>
                   </div>
                   <div>
                     <label class="block text-xs text-txt-secondary mb-1.5">宽度 (px)</label>
-                    <input type="number" value="4" class="input-field w-full bg-bg-tertiary border border-border rounded-md px-3 py-2 text-txt-primary text-sm">
+                    <input type="number" value="4" data-field="width" class="input-field w-full bg-bg-tertiary border border-border rounded-md px-3 py-2 text-txt-primary text-sm">
                   </div>
                 </div>
 
@@ -994,7 +1002,7 @@
 
                 <div>
                   <label class="block text-xs text-txt-secondary mb-1.5">虚线样式 (dasharray)</label>
-                  <input type="text" value="4 2" placeholder="例如：4 2" class="input-field w-full bg-bg-tertiary border border-border rounded-md px-3 py-2 text-txt-primary text-sm font-mono">
+                  <input type="text" value="4 2" data-field="dasharray" placeholder="例如：4 2" class="input-field w-full bg-bg-tertiary border border-border rounded-md px-3 py-2 text-txt-primary text-sm font-mono">
                 </div>
               </div>
             </div>
@@ -1017,13 +1025,13 @@
                   <div>
                     <label class="block text-xs text-txt-secondary mb-1.5">填充颜色</label>
                     <div class="flex items-center gap-2">
-                      <input type="color" value="#CCFFCC" class="w-9 h-9 rounded bg-transparent border-0 cursor-pointer">
-                      <input type="text" value="#CCFFCC" class="input-field flex-1 bg-bg-tertiary border border-border rounded-md px-3 py-2 text-txt-primary text-sm font-mono">
+                      <input type="color" value="#CCFFCC" data-field="fill" class="w-9 h-9 rounded bg-transparent border-0 cursor-pointer">
+                      <input type="text" value="#CCFFCC" data-field="fill" class="input-field flex-1 bg-bg-tertiary border border-border rounded-md px-3 py-2 text-txt-primary text-sm font-mono">
                     </div>
                   </div>
                   <div>
                     <label class="block text-xs text-txt-secondary mb-1.5">填充不透明度 (%)</label>
-                    <input type="range" min="0" max="100" value="60" class="w-full accent-accent-teal mt-2">
+                    <input type="range" min="0" max="100" value="60" data-field="fillOpacity" class="w-full accent-accent-teal mt-2">
                   </div>
                 </div>
 
@@ -1031,13 +1039,13 @@
                   <div>
                     <label class="block text-xs text-txt-secondary mb-1.5">描边颜色</label>
                     <div class="flex items-center gap-2">
-                      <input type="color" value="#333333" class="w-9 h-9 rounded bg-transparent border-0 cursor-pointer">
-                      <input type="text" value="#333333" class="input-field flex-1 bg-bg-tertiary border border-border rounded-md px-3 py-2 text-txt-primary text-sm font-mono">
+                      <input type="color" value="#333333" data-field="stroke" class="w-9 h-9 rounded bg-transparent border-0 cursor-pointer">
+                      <input type="text" value="#333333" data-field="stroke" class="input-field flex-1 bg-bg-tertiary border border-border rounded-md px-3 py-2 text-txt-primary text-sm font-mono">
                     </div>
                   </div>
                   <div>
                     <label class="block text-xs text-txt-secondary mb-1.5">描边宽度 (px)</label>
-                    <input type="number" value="1" class="input-field w-full bg-bg-tertiary border border-border rounded-md px-3 py-2 text-txt-primary text-sm">
+                    <input type="number" value="1" data-field="strokeWidth" class="input-field w-full bg-bg-tertiary border border-border rounded-md px-3 py-2 text-txt-primary text-sm">
                   </div>
                 </div>
               </div>
@@ -1135,6 +1143,7 @@
       }
 
       panel.innerHTML = content;
+      bindPreviewInputs(type);
     }
 
     // Code content
@@ -1231,15 +1240,56 @@
         .replace(/[{}\[\]]/g, '<span class="text-txt-primary">$&</span>');
     }
 
+    function escapeHTML(str) {
+      return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function decodeXmlEntities(str) {
+      return str.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+    }
+
     function highlightXML(xml) {
-      return xml
-        .replace(/(&lt;\/?)([\w:]+)/g, '$1<span class="text-accent-blue">$2</span>')
-        .replace(/(\s)([\w-]+)(=)/g, '$1<span class="text-accent-purple">$2</span>$3')
-        .replace(/"([^"]*)"/g, '<span class="text-accent-teal">"$1"</span>');
+      let result = escapeHTML(xml);
+      const tokens = [];
+      let tokenIdx = 0;
+      const protect = (value) => {
+        const key = `{{${tokenIdx++}}}`;
+        tokens.push({ key, value });
+        return key;
+      };
+
+      // 1. Highlight quoted attribute values
+      result = result.replace(/"([^"]*)"/g, (match, val) => {
+        return protect(`<span class="text-accent-teal">"${val}"</span>`);
+      });
+
+      // 2. Highlight attribute names (support namespace prefixes)
+      result = result.replace(/(\s)([\w:-]+)(=)/g, (match, sp, name, eq) => {
+        return protect(`${sp}<span class="text-accent-purple">${name}</span>${eq}`);
+      });
+
+      // 3. Highlight tag names (support namespace prefixes)
+      result = result.replace(/(&lt;\/?)([\w:]+)/g, (match, slash, name) => {
+        return protect(`&lt;${slash}<span class="text-accent-blue">${name}</span>`);
+      });
+
+      tokens.forEach(t => {
+        result = result.split(t.key).join(t.value);
+      });
+      return result;
+    }
+
+    function renderCodeLines(highlighted, containerId) {
+      const container = document.getElementById(containerId);
+      const lines = highlighted.split('\n');
+      container.innerHTML = lines.map(line =>
+        `<div class="code-line">${line || '&nbsp;'}</div>`
+      ).join('');
     }
 
     document.getElementById('code-json').innerHTML = highlightJSON(jsonCode);
-    document.getElementById('code-xml').innerHTML = highlightXML(xmlCode);
+    renderCodeLines(highlightJSON(jsonCode), 'code-json');
+    renderCodeLines(highlightXML(decodeXmlEntities(xmlCode)), 'code-xml');
 
     // Tab switching
     document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -1324,6 +1374,28 @@
     const previewCanvas = document.getElementById('preview-canvas');
     let currentSample = 'point';
 
+    const previewState = {
+      point: {
+        color: '#FF0000',
+        strokeColor: '#000000',
+        strokeWidth: 1,
+        size: 12
+      },
+      line: {
+        color: '#FF0000',
+        width: 4,
+        secondaryColor: '#999999',
+        secondaryWidth: 3,
+        dasharray: '8 4'
+      },
+      polygon: {
+        fill: '#CCFFCC',
+        fillOpacity: 0.6,
+        stroke: '#333333',
+        strokeWidth: 1
+      }
+    };
+
     function updateSampleButtons(sample) {
       document.querySelectorAll('.preview-sample-btn').forEach(b => {
         const isActive = b.dataset.sample === sample;
@@ -1356,6 +1428,7 @@
     }
 
     function renderPreview(sample) {
+      const state = previewState[sample];
       let svg = '';
 
       // Background grid lines
@@ -1367,7 +1440,7 @@
       }
 
       if (sample === 'point') {
-        // Sample points
+        const radius = Math.max(3, state.size / 2);
         const points = [
           {x: 150, y: 100, label: '实验小学'},
           {x: 320, y: 180, label: '第一中学'},
@@ -1376,10 +1449,9 @@
           {x: 250, y: 240, label: '体育馆'}
         ];
         points.forEach(p => {
-          svg += `<circle cx="${p.x}" cy="${p.y}" r="8" fill="#FF0000" stroke="#000" stroke-width="1" class="map-sample"/>`;
-          svg += `<text x="${p.x}" y="${p.y - 14}" text-anchor="middle" fill="#000000" font-size="12" font-family="Arial" font-weight="bold" class="map-sample">${p.label}</text>`;
+          svg += `<circle cx="${p.x}" cy="${p.y}" r="${radius}" fill="${state.color}" stroke="${state.strokeColor}" stroke-width="${state.strokeWidth}" class="map-sample"/>`;
+          svg += `<text x="${p.x}" y="${p.y - radius - 6}" text-anchor="middle" fill="${state.strokeColor}" font-size="12" font-family="Arial" font-weight="bold" class="map-sample">${p.label}</text>`;
         });
-        // Other facilities (gray)
         const others = [
           {x: 420, y: 220},
           {x: 550, y: 90},
@@ -1389,24 +1461,60 @@
           svg += `<rect x="${p.x - 5}" y="${p.y - 5}" width="10" height="10" fill="#CCCCCC" class="map-sample"/>`;
         });
       } else if (sample === 'line') {
-        // Sample roads
-        svg += `<path d="M50 250 Q200 200 350 220 T650 180" fill="none" stroke="#FF0000" stroke-width="6" stroke-linecap="round" class="map-sample"/>`;
-        svg += `<path d="M100 80 Q250 120 400 100 T750 140" fill="none" stroke="#999999" stroke-width="3" stroke-dasharray="8 4" class="map-sample"/>`;
-        svg += `<path d="M500 50 L520 250" fill="none" stroke="#999999" stroke-width="2" stroke-dasharray="6 3" class="map-sample"/>`;
-        // Labels
-        svg += `<text x="300" y="190" fill="#FF0000" font-size="11" font-family="Arial">国道</text>`;
-        svg += `<text x="450" y="90" fill="#999999" font-size="11" font-family="Arial">城市道路</text>`;
+        svg += `<path d="M50 250 Q200 200 350 220 T650 180" fill="none" stroke="${state.color}" stroke-width="${state.width}" stroke-linecap="round" class="map-sample"/>`;
+        svg += `<path d="M100 80 Q250 120 400 100 T750 140" fill="none" stroke="${state.secondaryColor}" stroke-width="${state.secondaryWidth}" stroke-dasharray="${state.dasharray}" class="map-sample"/>`;
+        svg += `<path d="M500 50 L520 250" fill="none" stroke="${state.secondaryColor}" stroke-width="2" stroke-dasharray="6 3" class="map-sample"/>`;
+        svg += `<text x="300" y="190" fill="${state.color}" font-size="11" font-family="Arial">国道</text>`;
+        svg += `<text x="450" y="90" fill="${state.secondaryColor}" font-size="11" font-family="Arial">城市道路</text>`;
       } else if (sample === 'polygon') {
-        // Sample polygons
-        svg += `<polygon points="100,80 280,60 320,180 150,200" fill="#CCFFCC" fill-opacity="0.6" stroke="#333333" stroke-width="1" class="map-sample"/>`;
-        svg += `<polygon points="350,120 550,100 580,220 400,240" fill="#CCFFCC" fill-opacity="0.6" stroke="#333333" stroke-width="1" class="map-sample"/>`;
-        svg += `<polygon points="600,150 720,140 740,260 620,270" fill="#CCFFCC" fill-opacity="0.6" stroke="#333333" stroke-width="1" class="map-sample"/>`;
-        // Labels
-        svg += `<text x="200" y="130" fill="#333333" font-size="12" font-family="Arial" text-anchor="middle">居民区</text>`;
-        svg += `<text x="470" y="170" fill="#333333" font-size="12" font-family="Arial" text-anchor="middle">公园</text>`;
+        const fillOpacity = state.fillOpacity;
+        svg += `<polygon points="100,80 280,60 320,180 150,200" fill="${state.fill}" fill-opacity="${fillOpacity}" stroke="${state.stroke}" stroke-width="${state.strokeWidth}" class="map-sample"/>`;
+        svg += `<polygon points="350,120 550,100 580,220 400,240" fill="${state.fill}" fill-opacity="${fillOpacity}" stroke="${state.stroke}" stroke-width="${state.strokeWidth}" class="map-sample"/>`;
+        svg += `<polygon points="600,150 720,140 740,260 620,270" fill="${state.fill}" fill-opacity="${fillOpacity}" stroke="${state.stroke}" stroke-width="${state.strokeWidth}" class="map-sample"/>`;
+        svg += `<text x="200" y="130" fill="${state.stroke}" font-size="12" font-family="Arial" text-anchor="middle">居民区</text>`;
+        svg += `<text x="470" y="170" fill="${state.stroke}" font-size="12" font-family="Arial" text-anchor="middle">公园</text>`;
       }
 
       previewCanvas.innerHTML = svg;
+    }
+
+    function bindPreviewInputs(type) {
+      const panel = document.getElementById('property-panel');
+      if (!panel) return;
+
+      const handlers = {
+        'symbolizer-point': () => {
+          bindField(panel, 'color', 'point', 'color');
+          bindField(panel, 'strokeColor', 'point', 'strokeColor');
+          bindField(panel, 'size', 'point', 'size', true);
+          bindField(panel, 'strokeWidth', 'point', 'strokeWidth', true);
+        },
+        'symbolizer-line': () => {
+          bindField(panel, 'color', 'line', 'color');
+          bindField(panel, 'width', 'line', 'width', true);
+          bindField(panel, 'dasharray', 'line', 'dasharray');
+        },
+        'symbolizer-polygon': () => {
+          bindField(panel, 'fill', 'polygon', 'fill');
+          bindField(panel, 'stroke', 'polygon', 'stroke');
+          bindField(panel, 'strokeWidth', 'polygon', 'strokeWidth', true);
+          bindField(panel, 'fillOpacity', 'polygon', 'fillOpacity', true, v => v / 100);
+        }
+      };
+
+      if (handlers[type]) handlers[type]();
+    }
+
+    function bindField(panel, field, target, key, isNumber = false, transform = v => v) {
+      const inputs = panel.querySelectorAll(`[data-field="${field}"]`);
+      inputs.forEach(input => {
+        input.addEventListener('input', (e) => {
+          let value = e.target.value;
+          if (isNumber) value = parseFloat(value) || 0;
+          previewState[target][key] = transform(value);
+          if (currentSample === target) renderPreview(target);
+        });
+      });
     }
 
     renderPreview(currentSample);

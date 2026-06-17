@@ -1,0 +1,47 @@
+{
+  "name": "@sldagent/electron",
+  "version": "1.0.0",
+  "description": "SLDAgent Electron shell - main process, preload, and window management",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc -b",
+    "dev": "electron ."
+  },
+  "dependencies": {
+    "@sldagent/core": "1.0.0"
+  },
+  "devDependencies": {
+    "electron": "^30.5.1",
+    "electron-builder": "^24.13.0",
+    "typescript": "^5.4.0",
+    "@types/node": "^20.11.0"
+  },
+  "build": {
+    "appId": "com.sldagent.app",
+    "productName": "SLDAgent",
+    "directories": {
+      "output": "../../dist"
+    },
+    "files": [
+      "dist/**/*",
+      "../../SourceCode/backend/dist/**/*",
+      "../../SourceCode/frontend/dist/**/*",
+      "../../SourceCode/data/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "../../SourceCode/data",
+        "to": "data"
+      }
+    ],
+    "mac": {
+      "target": "dmg"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
+  }
+}

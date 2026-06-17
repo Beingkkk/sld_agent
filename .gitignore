@@ -63,6 +63,14 @@ SourceCode/backend/node_modules/
 SourceCode/frontend/dist/
 SourceCode/frontend/node_modules/
 
+# Core specific
+SourceCode/core/dist/
+SourceCode/core/node_modules/
+
+# Electron specific
+SourceCode/electron/dist/
+SourceCode/electron/node_modules/
+
 # Config overrides (keep template)
 SourceCode/config/config.json
 !SourceCode/config/config.json.template

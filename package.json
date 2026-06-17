@@ -1,0 +1,40 @@
+{
+  "name": "sldagent",
+  "version": "1.0.0",
+  "private": true,
+  "description": "SLDAgent - SLD intelligent style editor (Electron + Vue 3 + Node.js/TypeScript)",
+  "workspaces": [
+    "SourceCode/core",
+    "SourceCode/frontend",
+    "SourceCode/backend",
+    "SourceCode/electron"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:frontend": "npm run dev --workspace=@sldagent/frontend",
+    "dev:backend": "npm run dev --workspace=@sldagent/backend",
+    "electron:dev": "npm run build --workspace=@sldagent/electron && concurrently --kill-others --names backend,frontend,electron \"npm run dev:backend\" \"npm run dev:frontend\" \"wait-on http://localhost:5173 && node SourceCode/electron/scripts/dev.cjs\"",
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm test --workspaces --if-present",
+    "lint": "eslint SourceCode --ext .ts,.vue",
+    "typecheck": "tsc -b"
+  },
+  "dependencies": {
+    "fast-xml-parser": "^4.3.0",
+    "geostyler-openlayers-parser": "^5.7.0",
+    "geostyler-sld-parser": "^9.0.1",
+    "geostyler-style": "^12.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "concurrently": "^8.2.0",
+    "wait-on": "^7.2.0",
+    "electron": "^30.5.1",
+    "electron-builder": "^24.13.3",
+    "eslint": "^8.57.0",
+    "typescript": "^5.4.0"
+  },
+  "engines": {
+    "node": ">=20.6.0"
+  }
+}
