@@ -1,8 +1,24 @@
 <script setup lang="ts">
 import WindowControls from './WindowControls.vue';
 import { useSLDStore } from '../../store';
+import { computed } from 'vue';
 
 const store = useSLDStore();
+
+const backendStatus = computed(() => store.backendStatus);
+
+const backendStatusMeta = computed(() => {
+  switch (backendStatus.value) {
+    case 'connected':
+      return { label: 'Agent 已连接', dotClass: 'bg-green-500' };
+    case 'connecting':
+      return { label: 'Agent 连接中', dotClass: 'bg-amber-500' };
+    case 'error':
+      return { label: 'Agent 离线', dotClass: 'bg-accent-red' };
+    default:
+      return { label: 'Agent 未启动', dotClass: 'bg-text-tertiary' };
+  }
+});
 
 async function handleImport() {
   if (window.electronAPI?.openSld) {
@@ -86,7 +102,16 @@ async function handleExport() {
       </button>
     </div>
 
-    <!-- Right: Window Controls -->
-    <WindowControls />
+    <!-- Right: Backend Status + Window Controls -->
+    <div class="flex items-center gap-3 px-3" style="-webkit-app-region: no-drag;">
+      <div
+        class="flex items-center gap-1.5 text-xs text-text-secondary"
+        :title="backendStatusMeta.label"
+      >
+        <span class="w-2 h-2 rounded-full" :class="backendStatusMeta.dotClass" />
+        <span class="hidden sm:inline">{{ backendStatusMeta.label }}</span>
+      </div>
+      <WindowControls />
+    </div>
   </div>
 </template>

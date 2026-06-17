@@ -119,6 +119,8 @@ export class AgentServer {
         return this.handleExplainRule(message);
       case 'explain_property':
         return this.handleExplainProperty(message);
+      case 'explain_validation':
+        return this.handleExplainValidation(message);
       case 'generate_rules':
         return this.handleGenerateRules(message);
       default:
@@ -136,15 +138,31 @@ export class AgentServer {
 
     // Navigate to the Rule node using the path
     const path = new TreePath(pathArray);
-    let node: unknown = treeSnapshot.root.namedLayer;
+    let node: unknown = treeSnapshot.root as unknown;
     const segments = path.toArray();
 
-    for (let i = 1; i < segments.length; i++) {
+    for (let i = 0; i < segments.length; i++) {
       const idx = segments[i];
-      if (node && typeof node === 'object' && 'children' in node) {
-        const children = (node as Record<string, unknown>).children as unknown[];
-        node = children[idx];
+      if (i === 0) {
+        if (idx !== 0) {
+          throw new Error('Invalid path: root segment must be 0');
+        }
+        node = treeSnapshot.root.namedLayer;
+      } else {
+        if (node && typeof node === 'object' && 'children' in node) {
+          const children = (node as Record<string, unknown>).children as unknown[];
+          if (idx < 0 || idx >= children.length) {
+            throw new Error(`Invalid path: index ${idx} out of range`);
+          }
+          node = children[idx];
+        } else {
+          throw new Error('Invalid path: node has no children');
+        }
       }
+    }
+
+    if (!node || typeof node !== 'object' || (node as Record<string, unknown>).type !== 'Rule') {
+      throw new Error('Path does not point to a Rule node');
     }
 
     const ruleNode = node as RuleNode;
@@ -186,6 +204,26 @@ export class AgentServer {
         text,
         warnings: warnings.length > 0 ? warnings : undefined,
       },
+    };
+  }
+
+  private async handleExplainValidation(message: AgentMessage): Promise<AgentResponse> {
+    const treeSnapshot = message.payload.treeSnapshot as TreeStateSnapshot;
+    const code = message.payload.code as string;
+    const pathArray = message.payload.path as number[];
+    const issueMessage = message.payload.message as string;
+
+    const prompt = PromptBuilder.explainValidation(
+      { code, path: pathArray, message: issueMessage },
+      treeSnapshot,
+      this.knowledgeBase
+    );
+    const text = await this.llmClient.complete(prompt);
+
+    return {
+      type: 'validation_explanation',
+      id: message.id,
+      payload: { text },
     };
   }
 

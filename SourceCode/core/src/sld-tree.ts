@@ -17,6 +17,7 @@ import {
   type GeoStylerStyle,
   type ScaleDenominatorRange,
   type FeatureTypeStyleMeta,
+  type TreeStateSnapshot,
 } from './types.js';
 import { GeoStylerTransformer } from './transformer.js';
 import { ValidationEngine } from './validation-engine.js';
@@ -404,6 +405,20 @@ export class SLDTree {
 
   validate(): ValidationIssue[] {
     return new ValidationEngine().validate(this.root);
+  }
+
+  toSnapshot(
+    selectedPath?: TreePath | null,
+    expandedPaths?: string[],
+    issues?: ValidationIssue[]
+  ): TreeStateSnapshot {
+    return {
+      version: this.root.version,
+      root: this.root,
+      selectedPath: selectedPath?.toArray() ?? null,
+      expandedPaths: expandedPaths ?? [],
+      issues: issues ?? [],
+    };
   }
 
   getNodeAt(path: TreePath): NamedLayerNode | UserStyleNode | FeatureTypeStyleNode | RuleNode | SymbolizerNode | null {

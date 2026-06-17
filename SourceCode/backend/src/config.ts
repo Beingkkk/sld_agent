@@ -29,7 +29,7 @@ const DEFAULT_CONFIG: AppConfig = {
     maxTokens: 2048,
   },
   server: {
-    port: 8765,
+    port: 18765,
     host: '127.0.0.1',
   },
 };

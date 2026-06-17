@@ -113,6 +113,30 @@ export class PromptBuilder {
     return lines.join('\n');
   }
 
+  static explainValidation(
+    issue: { code: string; path: number[]; message: string },
+    treeSnapshot: TreeStateSnapshot,
+    kb: KnowledgeBase
+  ): string {
+    const lines: string[] = [
+      '你是一位 SLD（Styled Layer Descriptor）样式专家。请解释以下校验错误的含义、产生原因以及修复建议。',
+      '',
+      '# 校验问题信息',
+      `- 错误码: ${issue.code}`,
+      `- 错误描述: ${issue.message}`,
+      `- 节点路径: ${JSON.stringify(issue.path)}`,
+      '',
+      '# 当前 SLD 树快照',
+      JSON.stringify(treeSnapshot.root, null, 2),
+      '',
+      kb.buildConstraintsPrompt(),
+      '',
+      '请用中文返回：1) 这个错误是什么意思；2) 为什么会触发；3) 如何修复。保持简洁。',
+    ];
+
+    return lines.join('\n');
+  }
+
   static generateStyle(userPrompt: string, dataSchema: Record<string, unknown>, kb: KnowledgeBase): string {
     const lines: string[] = [
       '你是一位 SLD 样式专家。请根据用户的自然语言描述，生成对应的 GeoStyler Style 配置。',

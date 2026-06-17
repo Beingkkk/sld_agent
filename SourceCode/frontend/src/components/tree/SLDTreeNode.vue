@@ -76,6 +76,12 @@ function selectNode() {
   store.selectNode(props.path);
 }
 
+function explainRuleNode(e: Event) {
+  e.stopPropagation();
+  store.selectNode(props.path);
+  store.explainSelectedRule();
+}
+
 // Context menu
 const showContextMenu = ref(false);
 const contextMenuPos = ref({ x: 0, y: 0 });
@@ -282,6 +288,17 @@ const childNodes = computed(() => {
       >
         {{ node.data.name || node.data.title }}
       </span>
+
+      <!-- AI explain button for Rule nodes -->
+      <button
+        v-if="node.type === 'Rule'"
+        class="ml-auto opacity-0 group-hover:opacity-100 transition-opacity text-text-tertiary hover:text-accent-teal text-xs w-5 h-5 flex items-center justify-center rounded hover:bg-bg-hover"
+        title="AI 解释此 Rule"
+        :disabled="store.backendStatus !== 'connected'"
+        @click.stop="explainRuleNode"
+      >
+        ?
+      </button>
     </div>
 
     <!-- Children -->

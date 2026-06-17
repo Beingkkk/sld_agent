@@ -14,7 +14,7 @@ import CodePanel from './components/code/CodePanel.vue';
     <!-- Main Content: Three Column Layout -->
     <div class="flex-1 flex overflow-hidden">
       <!-- Left Panel: SLD Tree -->
-      <div class="flex-1 min-w-[220px] max-w-[320px] flex flex-col border-r border-border-default">
+      <div class="flex-[2] min-w-[220px] flex flex-col border-r border-border-default">
         <div class="px-4 py-2 text-xs font-medium text-text-secondary uppercase tracking-wider border-b border-border-default">
           SLD 树
         </div>
@@ -24,7 +24,7 @@ import CodePanel from './components/code/CodePanel.vue';
       </div>
 
       <!-- Middle Panel: Property Editor + Map Preview -->
-      <div class="flex-[2] flex flex-col border-r border-border-default min-w-0">
+      <div class="flex-[3] flex flex-col border-r border-border-default min-w-0">
         <!-- Property Editor -->
         <div class="flex-1 overflow-auto p-4 min-h-0">
           <PropertyForm />
@@ -35,8 +35,8 @@ import CodePanel from './components/code/CodePanel.vue';
         </div>
       </div>
 
-      <!-- Right Panel: Code + Validation -->
-      <div class="flex-1 min-w-[280px] max-w-[420px] flex flex-col">
+      <!-- Right Panel: Code + Validation + AI -->
+      <div class="flex-[3] min-w-[300px] flex flex-col">
         <CodePanel />
       </div>
     </div>

@@ -183,11 +183,21 @@ function renderFieldRow(fieldId: string, meta: typeof fieldRegistry.fields[strin
         <div
           v-for="item in group.fields"
           :key="item.fieldId"
-          class="space-y-1"
+          class="space-y-1 group"
         >
-          <label class="text-xs text-text-secondary block">
-            {{ item.meta.label }}
-          </label>
+          <div class="flex items-center justify-between">
+            <label class="text-xs text-text-secondary block">
+              {{ item.meta.label }}
+            </label>
+            <button
+              class="opacity-0 group-hover:opacity-100 transition-opacity text-text-tertiary hover:text-accent-teal text-xs w-5 h-5 flex items-center justify-center rounded hover:bg-bg-hover"
+              title="AI 解释此字段"
+              :disabled="store.backendStatus !== 'connected'"
+              @click.stop="store.explainProperty(item.fieldId, item.meta.label, getFieldValue(item.fieldId))"
+            >
+              ?
+            </button>
+          </div>
           <FormFieldRenderer
             :editor-type="item.meta.editor"
             :model-value="getFieldValue(item.fieldId) ?? item.meta.default"
@@ -208,11 +218,21 @@ function renderFieldRow(fieldId: string, meta: typeof fieldRegistry.fields[strin
         <div
           v-for="item in groupedFields.ungrouped"
           :key="item.fieldId"
-          class="space-y-1"
+          class="space-y-1 group"
         >
-          <label class="text-xs text-text-secondary block">
-            {{ item.meta.label }}
-          </label>
+          <div class="flex items-center justify-between">
+            <label class="text-xs text-text-secondary block">
+              {{ item.meta.label }}
+            </label>
+            <button
+              class="opacity-0 group-hover:opacity-100 transition-opacity text-text-tertiary hover:text-accent-teal text-xs w-5 h-5 flex items-center justify-center rounded hover:bg-bg-hover"
+              title="AI 解释此字段"
+              :disabled="store.backendStatus !== 'connected'"
+              @click.stop="store.explainProperty(item.fieldId, item.meta.label, getFieldValue(item.fieldId))"
+            >
+              ?
+            </button>
+          </div>
           <FormFieldRenderer
             :editor-type="item.meta.editor"
             :model-value="getFieldValue(item.fieldId) ?? item.meta.default"
